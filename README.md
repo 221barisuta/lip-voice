@@ -22,12 +22,36 @@ scripts/  配置スクリプト（dev / prod 切り替え）
 docs/     仕様書
 ```
 
-## セットアップ（概要）
-1. GCP プロジェクトを専用に作り、Firebase を有効化
-2. `.env.dev.example` をコピーして `.env.dev` を作り、値を埋める
-3. `scripts/deploy.sh dev`
+## 初回セットアップ（dev）
+前提: Node 22.12 以上、Python 3.12 以上、`gcloud` と `firebase-tools`（`npx` で可）。
 
-秘密の値は `.env.*` にのみ置く。リポジトリには入れない。
+1. 専用の GCP プロジェクトを作り、課金を有効にし、予算アラートを月1,000円で設定する
+2. [Firebase コンソール](https://console.firebase.google.com/)でそのプロジェクトに Firebase を追加し、Web アプリを登録して設定値を控える
+3. Authentication → Sign-in method で **Google を有効化**（サポートメールを設定）。OAuth 同意画面は Firebase が作る。外部公開の「テスト」状態なら、自分のアカウントをテストユーザーに追加する
+4. Authentication → Settings → 承認済みドメインに `<project>.web.app` と `<project>.firebaseapp.com` があることを確認（通常は自動）
+5. `.env.dev.example` をコピーして `.env.dev` を作り、値を埋める（`ALLOWED_EMAILS` に自分のメールを入れる）
+6. `gcloud auth login` と `firebase login` を済ませ、`scripts/deploy.sh dev` を実行
+7. 自分で一度ログインしてアカウントができたら、Authentication → Settings → ユーザーの操作 →
+   **「作成（登録）を有効にする」をオフ**にする（第三者のアカウント作成を防ぐ。サーバー側も `ALLOWED_EMAILS` で絞っている）
+
+Firestore とバケットのリージョンは作成後に変更できない（既定は `asia-northeast1`）。
+
+## ローカル開発
+```
+# 1. エミュレータ（Auth / Firestore / Storage）
+cd infra && npx firebase-tools emulators:start --only auth,firestore,storage --project demo-lipvoice
+
+# 2. API
+cd server && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+export FIRESTORE_EMULATOR_HOST=127.0.0.1:8081 STORAGE_EMULATOR_HOST=http://127.0.0.1:9199 \
+       FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 GCP_PROJECT_ID=demo-lipvoice \
+       GCS_BUCKET=demo-lipvoice.appspot.com ALLOWED_ORIGINS=http://localhost:5173 ALLOWED_EMAILS=you@example.com
+.venv/bin/uvicorn main:app --port 8000
+
+# 3. 画面（.env.emulator に VITE_* を書く。git 管理外）
+cd web && npm ci && npm run dev:emulator
+```
+テスト: `server/` で `pytest`、`web/` で `npm test`、`infra/rules-test/` で `npm test`（エミュレータ起動中）。
 
 ## 安全上の前提
 - 緊急の呼び出しはこの仕組みに頼らない
