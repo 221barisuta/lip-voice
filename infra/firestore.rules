@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 自分の uid の配下だけ読める。書き込みはサーバー（Admin SDK、ルールの対象外）経由のみ。
+    // クライアントから直接書かせないのは、サーバー側の検証（phrase_id、サイズ、日次上限）を迂回させないため。
+    match /users/{uid}/{document=**} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
