@@ -1,0 +1,36 @@
+# secrets / environment
+.env
+.env.*
+!.env.*.example
+*.json.key
+service-account*.json
+firebase-adminsdk*.json
+.firebase/
+.firebaserc.local
+
+# personal data: recordings, features, models
+data/
+models/
+*.webm
+*.mp4
+*.pt
+*.onnx
+*.npy
+
+# node
+web/node_modules/
+web/dist/
+web/.vite/
+
+# python
+server/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
