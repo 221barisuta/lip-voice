@@ -36,7 +36,17 @@ docs/     仕様書
 
 Firestore とバケットのリージョンは作成後に変更できない（既定は `asia-northeast1`）。
 
-## ローカル開発
+## ローカル開発（dev の実プロジェクトに接続）
+```
+gcloud auth application-default login          # 初回のみ（サーバーが Firestore / GCS に入るための認証）
+gcloud auth application-default set-quota-project <GCP_PROJECT_ID>
+scripts/dev-server.sh                          # API を http://localhost:8000 で起動（.env.dev を読む）
+cd web && npm ci && npm run dev                # 画面を http://localhost:5173 で起動
+```
+Google ログインのポップアップは `localhost` が承認済みドメインなら動く（Firebase の既定）。
+サービスアカウントの鍵ファイルは作らない（ADC を使う）。
+
+## ローカル開発（エミュレータ。GCP 不要）
 ```
 # 1. エミュレータ（Auth / Firestore / Storage）
 cd infra && npx firebase-tools emulators:start --only auth,firestore,storage --project demo-lipvoice

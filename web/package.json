@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "prepare-assets": "node scripts/prepare-assets.mjs",
-    "dev": "npm run prepare-assets && vite --mode dev",
+    "dev": "npm run prepare-assets && VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000} vite --mode dev",
     "dev:emulator": "npm run prepare-assets && vite --mode emulator",
     "build": "npm run prepare-assets && tsc --noEmit && vite build --mode ${APP_ENV:-dev}",
     "typecheck": "tsc --noEmit",
