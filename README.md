@@ -34,7 +34,7 @@ docs/     仕様書
 7. 自分で一度ログインしてアカウントができたら、Authentication → Settings → ユーザーの操作 →
    **「作成（登録）を有効にする」をオフ**にする（第三者のアカウント作成を防ぐ。サーバー側も `ALLOWED_EMAILS` で絞っている）
 
-Firestore とバケットのリージョンは作成後に変更できない（既定は `asia-northeast1`）。
+Firestore とバケットのリージョンは作成後に変更できない。dev は Firestore が nam5、バケットが us-east1 のため、Cloud Run も `us-east1` にする（`GCP_REGION`）。prod は作成前に場所を決めること（データの所在は同意文にも書く）。
 
 ## ローカル開発（dev の実プロジェクトに接続）
 ```
