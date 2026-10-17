@@ -68,3 +68,23 @@ def test_stats_per_user(as_user, fake):
     post(as_user("alice"))
     assert as_user("alice").get("/clips/stats").json()["per_phrase"] == {"p01": 1}
     assert as_user("bob").get("/clips/stats").json()["per_phrase"] == {}
+
+
+def frames(n):
+    return json.dumps({"frames": [{"t": i * 33, "points": None, "blend": None} for i in range(n)]}).encode()
+
+
+def test_variable_length_clip_with_duration_meta(as_user, fake):
+    # 10 秒 × 30fps = 300 フレームの可変長録画
+    meta = {"phrase_id": "p01", "session_id": "s1", "frame_count": 300,
+            "duration_ms": 10000, "stop_reason": "max"}
+    assert post(as_user("alice"), meta=meta, lm=frames(300)).status_code == 201
+
+
+def test_too_many_frames_rejected(as_user, fake):
+    assert post(as_user("alice"), lm=frames(901)).status_code == 422
+
+
+def test_bad_stop_reason_rejected(as_user, fake):
+    meta = {"phrase_id": "p01", "session_id": "s1", "stop_reason": "whatever"}
+    assert post(as_user("alice"), meta=meta).status_code == 422

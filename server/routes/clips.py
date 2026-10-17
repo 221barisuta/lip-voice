@@ -11,9 +11,10 @@ from schemas import ClipMeta
 
 router = APIRouter()
 
-MAX_LANDMARKS_BYTES = 2 * 1024 * 1024   # 3 秒 × 30fps の特徴点 JSON は数百 KB
-MAX_VIDEO_BYTES = 5 * 1024 * 1024       # 96×96 の 3 秒 webm は数百 KB
-MAX_FRAMES = 600
+# 録画は可変長（口が止まるか最大 10〜15 秒で終了）。10 秒 × 30fps の特徴点 JSON は約 1MB
+MAX_LANDMARKS_BYTES = 4 * 1024 * 1024
+MAX_VIDEO_BYTES = 5 * 1024 * 1024       # 96×96 の webm は 10 秒でも 1MB 未満
+MAX_FRAMES = 900                        # 15 秒 × 60fps
 MAX_CLIPS_PER_DAY = 500                 # 濫用（コスト）対策。通常運用は 1 日 100 本程度
 EBML_MAGIC = b"\x1a\x45\xdf\xa3"        # webm (Matroska) の先頭
 

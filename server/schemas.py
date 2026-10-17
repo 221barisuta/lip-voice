@@ -1,4 +1,5 @@
 import re
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -33,7 +34,9 @@ class ClipMeta(BaseModel):
     session_id: str
     source: str = "collect"  # collect | use
     fps_measured: float | None = Field(default=None, ge=0, le=120)
-    frame_count: int | None = Field(default=None, ge=0, le=600)
+    frame_count: int | None = Field(default=None, ge=0, le=900)
+    duration_ms: int | None = Field(default=None, ge=0, le=20000)
+    stop_reason: Literal["still", "max", "no_motion"] | None = None
 
     @field_validator("phrase_id", "session_id")
     @classmethod

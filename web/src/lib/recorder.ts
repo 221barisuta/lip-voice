@@ -1,4 +1,4 @@
-import type { RecordedClip } from "../types/clip";
+import type { RecordedClip, StopReason } from "../types/clip";
 import type { LandmarkFile, LandmarkFrame, Point3 } from "../types/landmarks";
 import { LIP_INDICES } from "./mouthRegion";
 
@@ -28,7 +28,7 @@ export class ClipRecorder {
     this.frames.push({ t: Math.round(performance.now() - this.t0), points, blend });
   }
 
-  async stop(): Promise<RecordedClip> {
+  async stop(stopReason: StopReason): Promise<RecordedClip> {
     const seconds = (performance.now() - this.t0) / 1000;
     this.mr.stop();
     await this.stopped;
@@ -44,8 +44,15 @@ export class ClipRecorder {
       landmarks: new Blob([JSON.stringify(file)], { type: "application/json" }),
       video,
       previewUrl: URL.createObjectURL(video),
-      meta: { fps_measured: +(this.frames.length / seconds).toFixed(1), frame_count: this.frames.length },
+      meta: {
+        fps_measured: +(this.frames.length / seconds).toFixed(1),
+        frame_count: this.frames.length,
+        duration_ms: Math.round(seconds * 1000),
+        stop_reason: stopReason,
+      },
       detectedRatio: this.frames.length ? detected / this.frames.length : 0,
+      stopReason,
+      durationMs: Math.round(seconds * 1000),
     };
   }
 }

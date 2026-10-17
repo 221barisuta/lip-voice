@@ -12,6 +12,10 @@ export const MOUTH_CORNER_R = 291;
 export const EYE_OUTER_R = 33;
 export const EYE_OUTER_L = 263;
 
+/** 内側の上唇・下唇（口の開きの測定に使う） */
+export const LIP_INNER_UPPER = 13;
+export const LIP_INNER_LOWER = 14;
+
 export interface Px { x: number; y: number }
 
 export interface MouthGeometry {
@@ -36,4 +40,12 @@ export function mouthGeometry(lm: NormalizedLandmark[], w: number, h: number): M
     eyeDistance: Math.hypot(er.x - el.x, er.y - el.y),
     angle: Math.atan2(el.y - er.y, el.x - er.x),
   };
+}
+
+/** 口の開き（上唇と下唇の距離）。目尻間の距離を 1 とした値で、顔の位置・距離が変わっても同じ尺度。 */
+export function mouthOpening(lm: NormalizedLandmark[], w: number, h: number): number {
+  const u = toPx(lm[LIP_INNER_UPPER], w, h);
+  const l = toPx(lm[LIP_INNER_LOWER], w, h);
+  const eye = mouthGeometry(lm, w, h).eyeDistance || 1;
+  return Math.hypot(u.x - l.x, u.y - l.y) / eye;
 }

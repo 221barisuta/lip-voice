@@ -2,25 +2,36 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClipStats, RecordedClip } from "../types/clip";
 import type { Phrase } from "../types/phrase";
 import { getClipStats, getPhrases, postClip } from "./api";
+import type { CollectSettings } from "./collectSettings";
 import { PhraseQueue } from "./phraseQueue";
 
-export type Phase = "loading" | "idle" | "countdown" | "recording" | "review" | "saving" | "ended";
+export type Phase = "loading" | "idle" | "recording" | "review" | "saving" | "ended";
 
-export const RECORD_MS = 3000;
 export const SESSION_MS = 5 * 60 * 1000;   // 仕様 7.1: 1 セッション最大 5 分
 export const MIN_DETECTED_RATIO = 0.7;     // これ未満は顔が写っていないとみなし保存させない
 
 interface Camera {
-  record: (ms: number) => Promise<RecordedClip>;
+  record: (cfg: CollectSettings) => Promise<RecordedClip>;
   faceFound: boolean;
 }
 
-/** データ収集の進行（表示 → カウントダウン → 録画 → 保存/撮り直し → 次へ）。 */
-export function useCollect(camera: Camera, cameraReady: boolean) {
+/** 口の動きが検出できた録画で、顔も十分に写っている時だけ保存できる。 */
+export const isSavable = (c: RecordedClip) =>
+  c.stopReason !== "no_motion" && c.detectedRatio >= MIN_DETECTED_RATIO;
+
+export const unsavableReason = (c: RecordedClip) =>
+  c.stopReason === "no_motion"
+    ? "口の動きが検出できませんでした。撮り直してください"
+    : "顔が十分に検出できませんでした。撮り直してください";
+
+/**
+ * データ収集の進行（表示 → スペースを離して録画 → 口が止まる/最大秒数で終了 → 保存/撮り直し → 次へ）。
+ * 録画の終了条件は settings（口が止まったとみなす閾値・静止秒数・最大秒数）。
+ */
+export function useCollect(camera: Camera, cameraReady: boolean, settings: CollectSettings) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [phrase, setPhrase] = useState<Phrase | null>(null);
-  const [count, setCount] = useState(3);
   const [clip, setClip] = useState<RecordedClip | null>(null);
   const [stats, setStats] = useState<ClipStats>({ today: 0, per_phrase: {} });
   const [error, setError] = useState("");
@@ -75,20 +86,16 @@ export function useCollect(camera: Camera, cameraReady: boolean) {
     }
     setError("");
     startedAt.current ??= Date.now();
-    for (let n = 3; n >= 1; n--) {
-      setPhase("countdown");
-      setCount(n);
-      await new Promise((r) => setTimeout(r, 1000));
-    }
     setPhase("recording");
+    phaseRef.current = "recording"; // 連続して押されても二重に始めない
     try {
-      setClip(await camera.record(RECORD_MS));
+      setClip(await camera.record(settings));
       setPhase("review");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setPhase("idle");
     }
-  }, [camera, cameraReady]);
+  }, [camera, cameraReady, settings]);
 
   const retake = useCallback(() => {
     if (phaseRef.current !== "review") return;
@@ -99,8 +106,8 @@ export function useCollect(camera: Camera, cameraReady: boolean) {
 
   const save = useCallback(async () => {
     if (phaseRef.current !== "review" || !clip || !phrase) return;
-    if (clip.detectedRatio < MIN_DETECTED_RATIO) {
-      setError("顔が十分に検出できませんでした。撮り直してください");
+    if (!isSavable(clip)) {
+      setError(unsavableReason(clip));
       return;
     }
     setPhase("saving");
@@ -117,5 +124,5 @@ export function useCollect(camera: Camera, cameraReady: boolean) {
     }
   }, [clip, phrase]);
 
-  return { phase, phrase, phrases, count, clip, stats, error, remainingSec, start, retake, save };
+  return { phase, phrase, phrases, clip, stats, error, remainingSec, start, retake, save };
 }
