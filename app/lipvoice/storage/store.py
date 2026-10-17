@@ -190,6 +190,30 @@ class Store:
         return [{"date": r["date"], "n": r["n"], "top1": r["top1"] or 0, "top3": r["top3"] or 0, "rejected": r["rejected"] or 0}
                 for r in rows]
 
+    def list_clips(self, *, date: str | None = None, kind: str | None = None, limit: int = 100, offset: int = 0) -> dict:
+        """クリップの一覧（新しい順）。ファイルの場所は返さない。"""
+        where, args = [], []
+        if date:
+            where.append("c.date=?"); args.append(date)
+        if kind in ("phrase", "negative"):
+            where.append("c.kind=?"); args.append(kind)
+        cond = (" WHERE " + " AND ".join(where)) if where else ""
+        total = self.db.execute(f"SELECT COUNT(*) FROM clips c{cond}", args).fetchone()[0]
+        rows = self.db.execute(
+            "SELECT c.id, c.kind, c.source, c.date, c.created_at, c.duration_ms, c.detected_ratio, c.stop_reason, "
+            "COALESCE(p.text, c.negative_label, '') AS label FROM clips c LEFT JOIN phrases p ON p.id=c.phrase_id"
+            f"{cond} ORDER BY c.created_at DESC LIMIT ? OFFSET ?", [*args, max(1, min(limit, 500)), max(0, offset)]).fetchall()
+        dates = [r[0] for r in self.db.execute("SELECT DISTINCT date FROM clips ORDER BY date DESC")]
+        return {"clips": [dict(r) for r in rows], "total": total, "dates": dates}
+
+    def clip_video_path(self, clip_id: str) -> Path:
+        if not re.fullmatch(r"[0-9a-f]{32}", clip_id):
+            raise ValueError("クリップ ID が正しくありません")
+        row = self.db.execute("SELECT video_path FROM clips WHERE id=?", (clip_id,)).fetchone()
+        if row is None:
+            raise ValueError("クリップが見つかりません")
+        return self.clip_path(row["video_path"])
+
     def clip_rows(self) -> list[sqlite3.Row]:
         return self.db.execute("SELECT * FROM clips ORDER BY created_at").fetchall()
 

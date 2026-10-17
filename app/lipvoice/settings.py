@@ -30,6 +30,7 @@ class Settings:
     max_sec: float = 10.0
     # 学習・認識の特徴の切り出しに使う閾値（校正で threshold と一緒に更新する）。モデルには、学習時の値が保存される
     active_threshold: float = 0.01
+    calibrated_still_sec: float = 0.0    # 校正した時の still_sec（0 は未校正）。still_sec を変えたら再校正を促す
     # 収集セッション
     session_minutes: float = 5.0
     min_detected_ratio: float = 0.7      # 検出できたフレームの割合がこれ未満なら保存させない

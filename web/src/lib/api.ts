@@ -1,3 +1,4 @@
+import type { CalibrationState, ClipsPayload } from "../types/data";
 import type { Snapshot } from "../types/live";
 import type { ReportPayload } from "../types/report";
 
@@ -49,6 +50,12 @@ export const api = {
   report: () => json<ReportPayload>("/api/report"),
   activateModel: (version: string) => post("/api/models/activate", { version }),
   phrases: () => json<{ phrases: { id: string; text: string }[] }>("/api/phrases"),
+  clips: (query: string) => json<ClipsPayload>(`/api/clips?${query}`),
+  clipVideo: async (id: string): Promise<Blob> => (await raw(`/api/clips/${id}/video`)).blob(),
+  deleteClip: (id: string) => post(`/api/clips/${id}/delete`),
+  calibration: () => json<CalibrationState>("/api/calibrate"),
+  calibrateStart: (phase: "still" | "speech") => post("/api/calibrate/start", { phase }),
+  calibrateApply: () => post("/api/calibrate/apply", {}),
   pendingVideo: async (): Promise<Blob> => (await raw("/api/collect/pending/video")).blob(),
 };
 

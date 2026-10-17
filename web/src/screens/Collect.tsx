@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BigButton } from "../components/BigButton";
+import { Calibrate } from "../components/Calibrate";
 import { CameraView } from "../components/CameraView";
 import { CollectSettings } from "../components/CollectSettings";
 import { CollectStats } from "../components/CollectStats";
@@ -52,6 +53,7 @@ export function Collect() {
         <h1>セッション終了（{Math.round(c.session_total_sec / 60)}分）。おつかれさまでした</h1>
         <CollectStats stats={c.stats} phrases={c.phrases} />
         <CollectSettings liveRange={snap.live.live_range} disabled={false} />
+        <Calibrate disabled={false} />
         <BigButton tone="primary" onClick={act(api.newSession)}>新しいセッションを始める</BigButton>
       </main>
     );
@@ -87,6 +89,7 @@ export function Collect() {
       )}
       {error && <p role="alert" style={{ color: "crimson", fontSize: 18 }}>{error}</p>}
       <CollectSettings liveRange={snap.live.live_range} disabled={recording} />
+      <Calibrate disabled={c.phase !== "idle"} />
       <hr />
       <CollectStats stats={c.stats} phrases={c.phrases} />
     </main>

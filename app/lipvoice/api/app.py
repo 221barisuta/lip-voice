@@ -65,7 +65,7 @@ def create_app(engine: Engine, store: Store, collect: CollectSession, holder: Se
     # 画面から変えてよい設定。カメラ（camera_*）・時刻・制限値は、設定ファイルからだけ変えられる
     EDITABLE = {"threshold", "still_sec", "max_sec", "session_minutes", "min_detected_ratio", "negative_kinds",
                 "date_override", "auto_save", "idle_fps", "face_detection_confidence", "face_presence_confidence",
-                "tracking_confidence"}
+                "tracking_confidence", "active_threshold"}
 
     @app.put("/api/settings")
     def put_settings(changes: dict):
@@ -141,6 +141,9 @@ def create_app(engine: Engine, store: Store, collect: CollectSession, holder: Se
     def preview(body: PreviewBody):
         engine.set_full_preview(body.full)
         return {"full": body.full}
+
+    from . import data_routes
+    data_routes.register(app, engine, store, collect, holder)
 
     if speak is not None and models_root is not None:
         from . import ml_routes

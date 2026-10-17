@@ -160,6 +160,13 @@ class CollectSession:
             self.last_saved = None
             return self._stats
 
+    def forget(self, clip_id: str) -> None:
+        """データ確認画面でクリップが消された時に、「直前の保存を取り消す」の対象や統計から外す。"""
+        with self._lock:
+            self._saved_ids = [x for x in self._saved_ids if x[0] != clip_id]
+            self._stats = self._store.stats()
+            self.last_saved = None
+
     def tick(self) -> None:
         """5 分（設定可）で自動終了。録画中は録画が終わるまで待つ。"""
         with self._lock:
