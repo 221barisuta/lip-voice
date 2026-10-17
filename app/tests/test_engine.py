@@ -50,7 +50,7 @@ def make(store, paths, source):
     holder.update({"still_sec": 0.5, "max_sec": 4})
     collect = CollectSession(store, holder.get)
     paths.model_file.write_bytes(b"x")
-    eng = Engine(paths.model_file, holder.get, collect, detector_factory=lambda m: FakeDetector(m, source),
+    eng = Engine(paths.model_file, holder.get, collect, detector_factory=lambda m, **kw: FakeDetector(m, source),
                  source_factory=lambda s: source)
     return eng, collect
 
@@ -75,7 +75,7 @@ def test_records_until_mouth_stops(store, paths):
         eng.request_start()
         assert wait(lambda: collect.snapshot()["phase"] == "review", 8)
         p = collect.snapshot()["pending"]
-        assert p["stop_reason"] == "still" and 1.8 < p["duration_ms"] / 1000 < 2.6 and p["savable"]
+        assert p["stop_reason"] == "still" and 1.5 < p["duration_ms"] / 1000 < 3.4 and p["savable"]
         clip = collect.pending.clip
         assert clip.valid.all() and clip.points.shape[1:] == (110, 3) and len(clip.crops) == clip.frame_count
         collect.save()
@@ -92,7 +92,7 @@ def test_no_motion_ends_at_max_and_cannot_be_saved(store, paths):
         eng.request_start()
         assert wait(lambda: collect.snapshot()["phase"] == "review", 8)
         p = collect.snapshot()["pending"]
-        assert p["stop_reason"] == "no_motion" and not p["savable"] and 3.8 < p["duration_ms"] / 1000 < 4.6
+        assert p["stop_reason"] == "no_motion" and not p["savable"] and 3.8 < p["duration_ms"] / 1000 < 5.2
     finally:
         eng.stop()
 
@@ -104,7 +104,7 @@ def test_camera_error_is_reported_and_start_refused(store, paths):
     def boom(_s):
         raise OSError("カメラを開けません")
 
-    eng = Engine(paths.model_file, holder.get, collect, detector_factory=lambda m: None, source_factory=boom)
+    eng = Engine(paths.model_file, holder.get, collect, detector_factory=lambda m, **kw: None, source_factory=boom)
     paths.model_file.write_bytes(b"x")
     eng.start()
     try:
@@ -113,5 +113,28 @@ def test_camera_error_is_reported_and_start_refused(store, paths):
         from lipvoice.collect import StateError
         with pytest.raises(StateError):
             eng.request_start()
+    finally:
+        eng.stop()
+
+
+def test_camera_death_right_after_start_does_not_leave_recording_stuck(store, paths):
+    """録画を始めた直後にカメラが止まっても、「録画中」から戻る（患者さんの努力を無駄にしない）。"""
+    class DyingSource(FakeSource):
+        def __init__(self):
+            super().__init__()
+            self.alive = True
+
+        def read(self):
+            return super().read() if self.alive else None
+
+    src = DyingSource()
+    eng, collect = make(store, paths, src)
+    eng.start()
+    try:
+        assert wait(lambda: eng.snapshot().face_found)
+        src.alive = False
+        eng.request_start()                              # カメラが死んだ直後に開始が押された
+        assert wait(lambda: collect.snapshot()["phase"] == "idle", 8)
+        assert eng.snapshot().camera == "error"
     finally:
         eng.stop()

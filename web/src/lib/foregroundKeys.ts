@@ -3,8 +3,11 @@ import { useEffect, useRef } from "react";
 /** ブラウザが前面（フォーカスあり・タブ表示中）の時だけ true。 */
 export const isForeground = () => document.hasFocus() && document.visibilityState === "visible";
 
+const TEXT_TYPES = new Set(["text", "search", "number", "email", "url", "tel", "password"]);
+
+/** 文字を入力している時だけ、キー操作を横取りしない（チェックボックス・スライダー・ボタンにフォーカスがあっても、操作できる）。 */
 const isTyping = (t: EventTarget | null) =>
-  t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement;
+  (t instanceof HTMLInputElement && TEXT_TYPES.has(t.type)) || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement;
 
 type Handlers = Record<string, () => void>;
 

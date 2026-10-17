@@ -63,3 +63,9 @@ def normalize_mouth(lm: Landmarks, w: int, h: int) -> np.ndarray:
         dx, dy, dz = lm[i][0] * w - g.center[0], lm[i][1] * h - g.center[1], lm[i][2] * w
         out[r] = ((dx * cos - dy * sin) / s, (dx * sin + dy * cos) / s, dz / s)
     return out
+
+
+def mouth_width_ratio(lm: Landmarks, w: int, h: int) -> float:
+    """口の幅（口角間の距離）÷ 目尻間の距離。「い」「え」など、開きが変わらず横に広がる動きを見るため。"""
+    g = mouth_geometry(lm, w, h)
+    return g.mouth_width / (g.eye_distance or 1.0)

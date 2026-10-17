@@ -23,7 +23,7 @@ export function CameraView({ live, mouth, frame, recording, fullPreview, onFullP
       <div style={{ position: "relative" }}>
         {mouth
           ? <img alt="送信される口元" src={`data:image/jpeg;base64,${mouth}`} width={192} height={192}
-                 style={{ border: "1px solid #888", imageRendering: "pixelated" }} />
+                 style={{ border: "1px solid #888", imageRendering: "pixelated", opacity: live.face_found ? 1 : 0.3 }} />
           : <div style={{ width: 192, height: 192, background: "#eee" }} />}
         {recording && <span style={{ position: "absolute", top: 6, left: 6, color: "#fff", background: "#d00", padding: "2px 8px", borderRadius: 4 }}>● 録画中</span>}
       </div>
@@ -31,6 +31,7 @@ export function CameraView({ live, mouth, frame, recording, fullPreview, onFullP
         <p style={{ margin: "0 0 4px", color }}>{status}</p>
         <p style={{ margin: 0, fontSize: 12, color: "#555" }}>
           {live.source} ／ {live.fps} fps ／ 処理 {live.proc_ms} ms
+          {live.tilt_deg != null && ` ／ 顔の傾き ${live.tilt_deg.toFixed(0)}°`}
         </p>
         <label style={{ display: "block", marginTop: 8 }}>
           <input type="checkbox" checked={fullPreview} onChange={(e) => toggle(e.target.checked)} /> カメラ位置の確認（この画面にだけ表示）

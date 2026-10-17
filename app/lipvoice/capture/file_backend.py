@@ -33,7 +33,7 @@ class FileSource:
             time.sleep(delay)
         else:
             self._next = time.monotonic()   # 処理が遅れたら、遅れを取り戻そうとしない
-        return Frame(img, time.monotonic())
+        return Frame(img, time.perf_counter())
 
     def close(self) -> None:
         self._cap.release()

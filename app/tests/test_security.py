@@ -11,6 +11,7 @@ PORT = 8765
 class FakeLive:
     camera, message, source, fps, proc_ms, delegate = "ok", "", "fake", 30.0, 5.0, "CPU"
     face_found, opening, live_range, remaining_sec, seq = True, 0.1, 0.0, None, 0
+    tilt_deg = roll_deg = None
     mouth_jpeg = frame_jpeg = None
 
 

@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS phrases(
@@ -20,6 +20,12 @@ CREATE TABLE IF NOT EXISTS clips(
   landmarks_path TEXT NOT NULL, video_path TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_clips_date ON clips(date);
 CREATE INDEX IF NOT EXISTS idx_clips_phrase ON clips(phrase_id);
+CREATE TABLE IF NOT EXISTS predictions(
+  id TEXT PRIMARY KEY, created_at TEXT NOT NULL, date TEXT NOT NULL, clip_id TEXT,
+  model_version TEXT, model_kind TEXT, top3_json TEXT, distance REAL, rejected INTEGER, agree INTEGER,
+  chosen TEXT, outcome TEXT NOT NULL,   -- outcome: phrase（選ばれた）| negative（フレーズではない動き）| skipped
+  correct_top1 INTEGER, correct_top3 INTEGER, latency_ms REAL);
+CREATE INDEX IF NOT EXISTS idx_pred_date ON predictions(date);
 """
 
 

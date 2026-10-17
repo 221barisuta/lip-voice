@@ -32,7 +32,7 @@ class PreviewBody(BaseModel):
 
 def create_app(engine: Engine, store: Store, collect: CollectSession, holder: SettingsHolder, *,
                port: int, token: str, static_dir: Path | None = None, dev_origins: list[str] | None = None,
-               extra_hosts: list[str] | None = None) -> FastAPI:
+               extra_hosts: list[str] | None = None, speak=None, models_root: Path | None = None) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(StateError)
@@ -55,15 +55,21 @@ def create_app(engine: Engine, store: Store, collect: CollectSession, holder: Se
     def health():
         live = engine.snapshot()
         return {"ok": True, "version": __version__, "camera": live.camera, "message": live.message,
-                "source": live.source, "fps": live.fps, "proc_ms": live.proc_ms, "delegate": live.delegate}
+                "source": live.source, "fps": live.fps, "proc_ms": live.proc_ms, "delegate": live.delegate,
+                "tilt_deg": live.tilt_deg, "roll_deg": live.roll_deg}
 
     @app.get("/api/settings")
     def get_settings():
         return {"settings": asdict(holder.get()), "limits": {k: list(v) for k, v in LIMITS.items()}}
 
+    # 画面から変えてよい設定。カメラ（camera_*）・時刻・制限値は、設定ファイルからだけ変えられる
+    EDITABLE = {"threshold", "still_sec", "max_sec", "session_minutes", "min_detected_ratio", "negative_kinds",
+                "date_override", "auto_save", "idle_fps", "face_detection_confidence", "face_presence_confidence",
+                "tracking_confidence"}
+
     @app.put("/api/settings")
     def put_settings(changes: dict):
-        return {"settings": asdict(holder.update(changes))}
+        return {"settings": asdict(holder.update({k: v for k, v in changes.items() if k in EDITABLE}))}
 
     @app.get("/api/phrases")
     def get_phrases():
@@ -99,6 +105,21 @@ def create_app(engine: Engine, store: Store, collect: CollectSession, holder: Se
         clip_id = collect.save()
         return {"clip_id": clip_id, **collect.snapshot()}
 
+    @app.post("/api/collect/cancel")
+    def collect_cancel():
+        engine.cancel()                    # 録画の途中でやめる（保存しない）
+        return collect.snapshot()
+
+    @app.post("/api/collect/skip")
+    def collect_skip():
+        collect.skip()
+        return collect.snapshot()
+
+    @app.post("/api/collect/undo")
+    def collect_undo():
+        collect.undo_last()
+        return collect.snapshot()
+
     @app.post("/api/collect/discard")
     def collect_discard():
         collect.discard()
@@ -121,18 +142,25 @@ def create_app(engine: Engine, store: Store, collect: CollectSession, holder: Se
         engine.set_full_preview(body.full)
         return {"full": body.full}
 
+    if speak is not None and models_root is not None:
+        from . import ml_routes
+        ml_routes.register(app, engine, store, speak, models_root)
+
     # ---- 画面への配信（Server-Sent Events）----
     @app.get("/api/events")
     async def events(request: Request):
         async def gen():
-            last_seq, last_full, tick = -1, 0.0, 0
+            last_seq = -1
             while not await request.is_disconnected():
                 live = engine.snapshot()
                 payload = {"live": {"camera": live.camera, "message": live.message, "source": live.source,
                                     "face_found": live.face_found, "fps": live.fps, "proc_ms": live.proc_ms,
                                     "opening": live.opening, "live_range": live.live_range,
+                                    "tilt_deg": live.tilt_deg, "roll_deg": live.roll_deg,
                                     "remaining_sec": live.remaining_sec},
                            "collect": collect.snapshot()}
+                if speak is not None:
+                    payload["speak"] = speak.snapshot()
                 if live.seq != last_seq:
                     last_seq = live.seq
                     if live.mouth_jpeg:
@@ -140,7 +168,6 @@ def create_app(engine: Engine, store: Store, collect: CollectSession, holder: Se
                     if live.frame_jpeg:
                         payload["frame"] = base64.b64encode(live.frame_jpeg).decode()
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-                tick += 1
                 await asyncio.sleep(0.1)
         return StreamingResponse(gen(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})

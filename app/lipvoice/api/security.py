@@ -11,6 +11,16 @@ import json
 
 TOKEN_HEADER = "x-lipvoice-token"
 
+# 画面は同じ origin のものだけを読み込み、他のページに埋め込まれない（古いブラウザ向けの保険）
+SECURITY_HEADERS = [
+    (b"x-frame-options", b"DENY"),
+    (b"x-content-type-options", b"nosniff"),
+    (b"referrer-policy", b"no-referrer"),
+    (b"content-security-policy", b"default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; "
+                                 b"style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; "
+                                 b"frame-ancestors 'none'; base-uri 'none'; form-action 'none'"),
+]
+
 
 def allowed_hosts(port: int, extra: list[str] | None = None) -> set[str]:
     base = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
@@ -31,14 +41,19 @@ class LocalGuard:
         headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope["headers"]}
         problem = self._check(headers, scope.get("path", ""))
         if problem is None:
-            return await self.app(scope, receive, send)
+            async def send_with_headers(message):
+                if message["type"] == "http.response.start":
+                    have = {k.lower() for k, _ in message.get("headers", [])}
+                    message["headers"] = list(message.get("headers", [])) + [h for h in SECURITY_HEADERS if h[0] not in have]
+                await send(message)
+            return await self.app(scope, receive, send_with_headers if scope["type"] == "http" else send)
         status, msg = problem
         if scope["type"] == "websocket":
             return await send({"type": "websocket.close", "code": 1008})
         body = json.dumps({"detail": msg}, ensure_ascii=False).encode()
         await send({"type": "http.response.start", "status": status,
                     "headers": [(b"content-type", b"application/json; charset=utf-8"),
-                                (b"content-length", str(len(body)).encode())]})
+                                (b"content-length", str(len(body)).encode()), *SECURITY_HEADERS]})
         await send({"type": "http.response.body", "body": body})
 
     def _check(self, h: dict[str, str], path: str) -> tuple[int, str] | None:

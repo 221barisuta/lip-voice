@@ -1,4 +1,5 @@
 import type { Snapshot } from "../types/live";
+import type { ReportPayload } from "../types/report";
 
 /** トークンは、Python が画面を配信する時だけ HTML に埋め込む（他のサイトは読めない）。 */
 const token = (): string =>
@@ -38,6 +39,16 @@ export const api = {
   preview: (full: boolean) => post("/api/preview", { full }),
   settings: <T>() => json<T>("/api/settings"),
   putSettings: <T>(changes: Record<string, unknown>) => json<T>("/api/settings", { method: "PUT", body: JSON.stringify(changes) }),
+  cancel: () => post("/api/collect/cancel"),
+  skip: () => post("/api/collect/skip"),
+  undo: () => post("/api/collect/undo"),
+  speakStart: () => post("/api/speak/start"),
+  speakChoose: (phrase_id: string | null, negative = false) =>
+    post<{ choice: { text: string | null } }>("/api/speak/choose", { phrase_id, negative }),
+  speakSkip: () => post("/api/speak/skip"),
+  report: () => json<ReportPayload>("/api/report"),
+  activateModel: (version: string) => post("/api/models/activate", { version }),
+  phrases: () => json<{ phrases: { id: string; text: string }[] }>("/api/phrases"),
   pendingVideo: async (): Promise<Blob> => (await raw("/api/collect/pending/video")).blob(),
 };
 

@@ -55,17 +55,20 @@ class CollectSession:
         self.phase = "idle"                  # idle | recording | review | ended
         self.target: dict | None = None
         self.pending: Pending | None = None
-        self._queue = PhraseQueue(store.phrases())
+        self._phrases = store.phrases()
+        self._queue = PhraseQueue(self._phrases)
         self._started_at: float | None = None
         self.session_id = uuid.uuid4().hex
         self._phrase = self._queue.next()
         self._stats = store.stats()
+        self.last_saved: dict | None = None      # 直近に保存したもの（自動保存の表示用）
+        self._saved_ids: list[tuple[str, dict | None]] = []    # このセッションで保存したもの（取り消し用）
 
     # ---- 操作 ----
     def new_session(self) -> None:
         with self._lock:
             self.session_id = uuid.uuid4().hex
-            self._started_at, self.pending, self.phase = None, None, "idle"
+            self._started_at, self.pending, self.phase, self.target = None, None, "idle", None
             self._reload_phrases()
 
     def set_mode(self, mode: str, negative_label: str | None = None) -> None:
@@ -98,6 +101,8 @@ class CollectSession:
         pending = Pending(clip, clip.to_npz(), encode_webm(clip.crops, clip.t_ms))
         with self._lock:
             self.pending, self.phase = pending, "review"
+            if self._settings().auto_save and unsavable_reason(clip, self._settings()) is None:
+                self._save_locked()                 # 試験用: 保存できる録画は確認なしで保存して次へ
 
     def discard(self) -> None:
         with self._lock:
@@ -107,36 +112,65 @@ class CollectSession:
 
     def save(self) -> str:
         with self._lock:
-            if self.phase != "review" or not self.pending:
-                raise StateError("保存できる録画がありません")
-            clip = self.pending.clip
-            reason = unsavable_reason(clip, self._settings())
-            if reason:
-                raise StateError(reason)
-            t = self.target or {}
-            rec = ClipRecord(
-                kind=t.get("kind", "phrase"), session_id=self.session_id,
-                phrase_id=t["phrase"]["id"] if t.get("kind") == "phrase" else None,
-                negative_label=t.get("label") if t.get("kind") == "negative" else None,
-                duration_ms=clip.duration_ms, frame_count=clip.frame_count, fps_measured=clip.fps_measured,
-                detected_ratio=clip.detected_ratio, stop_reason=clip.stop_reason, width=clip.width, height=clip.height)
-            clip_id = self._store.save_clip(rec, self.pending.npz, self.pending.webm)
-            self._stats = self._store.stats()
-            self.pending, self.phase = None, "idle"
-            if rec.kind == "phrase":
+            return self._save_locked()
+
+    def _save_locked(self) -> str:
+        if self.phase != "review" or not self.pending:
+            raise StateError("保存できる録画がありません")
+        clip = self.pending.clip
+        reason = unsavable_reason(clip, self._settings())
+        if reason:
+            raise StateError(reason)
+        t = self.target or {}
+        rec = ClipRecord(
+            kind=t.get("kind", "phrase"), session_id=self.session_id,
+            phrase_id=t["phrase"]["id"] if t.get("kind") == "phrase" else None,
+            negative_label=t.get("label") if t.get("kind") == "negative" else None,
+            duration_ms=clip.duration_ms, frame_count=clip.frame_count, fps_measured=clip.fps_measured,
+            detected_ratio=clip.detected_ratio, stop_reason=clip.stop_reason, width=clip.width, height=clip.height)
+        clip_id = self._store.save_clip(rec, self.pending.npz, self.pending.webm)
+        self._stats = self._store.stats()
+        self.last_saved = {"label": (t.get("phrase") or {}).get("text") or t.get("label"),
+                           "seconds": round(clip.duration_ms / 1000, 1), "n": self._stats["today"]}
+        self.pending, self.phase = None, "idle"
+        self._saved_ids.append((clip_id, t.get("phrase") if rec.kind == "phrase" else None))
+        del self._saved_ids[:-20]
+        if rec.kind == "phrase":
+            self._phrase = self._queue.next()
+        return clip_id
+
+    def skip(self) -> None:
+        """このフレーズは今日はやらない（次のフレーズへ）。"""
+        with self._lock:
+            if self.phase != "idle":
+                raise StateError("いまはスキップできません")
+            if self.mode == "phrase":
                 self._phrase = self._queue.next()
-            return clip_id
+
+    def undo_last(self) -> dict:
+        """直前に保存したクリップを取り消す（違うフレーズを口パクしていた時など）。このセッションで保存したものだけ。"""
+        with self._lock:
+            if self.phase != "idle" or not self._saved_ids:
+                raise StateError("取り消せる保存がありません")
+            clip_id, phrase = self._saved_ids.pop()
+            self._store.delete_clip(clip_id)
+            self._stats = self._store.stats()
+            if phrase is not None:
+                self._phrase = phrase                 # 取り消したフレーズを、もう一度出す
+            self.last_saved = None
+            return self._stats
 
     def tick(self) -> None:
         """5 分（設定可）で自動終了。録画中は録画が終わるまで待つ。"""
         with self._lock:
-            if self._started_at is None or self.phase in ("recording", "ended"):
+            if self._started_at is None or self.phase in ("recording", "review", "ended"):   # 確認中の録画は消さない
                 return
             if self._clock() - self._started_at >= self._settings().session_minutes * 60:
                 self.pending, self.phase = None, "ended"
 
     def _reload_phrases(self) -> None:
-        self._queue = PhraseQueue(self._store.phrases())
+        self._phrases = self._store.phrases()
+        self._queue = PhraseQueue(self._phrases)
         self._phrase = self._queue.next()
 
     def phrases_changed(self) -> None:
@@ -162,4 +196,5 @@ class CollectSession:
                     "negative_kinds": s.negative_kinds, "phrase": self._phrase,
                     "target": self.target, "pending": pend, "session_remaining_sec": left,
                     "session_total_sec": int(s.session_minutes * 60), "stats": self._stats,
-                    "phrases": self._store.phrases()}
+                    "last_saved": self.last_saved, "date": self._store.today(), "auto_save": s.auto_save,
+                    "phrases": self._phrases}

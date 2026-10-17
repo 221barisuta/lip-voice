@@ -14,7 +14,7 @@ class RecordingController:
 
     def __init__(self, cfg: StillnessConfig, width: int, height: int, blend_names: list[str], t0: float | None = None):
         self.cfg = cfg
-        self.t0 = time.monotonic() if t0 is None else t0
+        self.t0 = time.perf_counter() if t0 is None else t0
         self._det = StillnessDetector(cfg)
         self._w, self._h, self._names = width, height, blend_names
         self._t: list[int] = []
@@ -31,7 +31,8 @@ class RecordingController:
     def remaining(self, now: float) -> float:
         return max(0.0, self.cfg.max_sec - self.elapsed(now))
 
-    def add(self, now: float, det: Detection | None, opening: float | None, crop: np.ndarray | None) -> StopReason | None:
+    def add(self, now: float, det: Detection | None, indicators, opening: float | None,
+            crop: np.ndarray | None) -> StopReason | None:
         t = self.elapsed(now)
         self._t.append(int(t * 1000))
         self._valid.append(det is not None)
@@ -42,7 +43,7 @@ class RecordingController:
             self._crops.append(crop)
         else:   # まだ切り出し位置が決まっていない間は、直前の絵（なければ黒）で埋める
             self._crops.append(self._crops[-1] if self._crops else np.zeros((96, 96), np.uint8))
-        return self._det.push(t, opening)
+        return self._det.push(t, indicators)
 
     def timed_out(self, now: float) -> StopReason | None:
         """フレームが来なくなっても、最大秒数で必ず終える。"""

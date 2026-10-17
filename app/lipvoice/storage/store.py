@@ -59,11 +59,14 @@ class Store:
 
     # ---- 日付 ----
     def today(self) -> str:
-        return datetime.now(ZoneInfo(self._settings().timezone)).strftime("%Y-%m-%d")
+        """撮影日。試験用に date_override が設定されていれば、それを使う（実際の収集では空）。"""
+        s = self._settings()
+        return s.date_override or datetime.now(ZoneInfo(s.timezone)).strftime("%Y-%m-%d")
 
     # ---- フレーズ ----
     def phrases(self) -> list[dict]:
-        rows = self.db.execute("SELECT id, text FROM phrases ORDER BY position").fetchall()
+        with self._lock:
+            rows = self.db.execute("SELECT id, text FROM phrases ORDER BY position").fetchall()
         return [{"id": r["id"], "text": r["text"]} for r in rows]
 
     def replace_phrases(self, phrases: list[dict], _initial: bool = False) -> list[dict]:
@@ -97,13 +100,13 @@ class Store:
         return self.db.execute("SELECT 1 FROM phrases WHERE id=?", (phrase_id,)).fetchone() is not None
 
     # ---- クリップ ----
-    def save_clip(self, rec: ClipRecord, npz: bytes, webm: bytes) -> str:
+    def save_clip(self, rec: ClipRecord, npz: bytes, webm: bytes, day: str | None = None) -> str:
         s = self._settings()
         if rec.kind == "phrase" and not (rec.phrase_id and self.phrase_exists(rec.phrase_id)):
             raise ValueError("phrase_id が存在しません")
         if rec.kind == "negative" and not rec.negative_label:
             raise ValueError("負例の種類がありません")
-        day = self.today()
+        day = day or self.today()
         with self._lock:
             if s.max_clips_per_day and self.count_on(day) >= s.max_clips_per_day:
                 raise LimitExceeded("本日の保存上限に達しました")
@@ -138,6 +141,24 @@ class Store:
                 raise
         return clip_id
 
+    def delete_clip(self, clip_id: str) -> None:
+        """クリップを消す（ファイルと記録）。ID は 32 桁の 16 進数だけを受け付ける。"""
+        if not re.fullmatch(r"[0-9a-f]{32}", clip_id):
+            raise ValueError("クリップ ID が正しくありません")
+        with self._lock:
+            row = self.db.execute("SELECT landmarks_path, video_path FROM clips WHERE id=?", (clip_id,)).fetchone()
+            if row is None:
+                raise ValueError("クリップが見つかりません")
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                self.db.execute("DELETE FROM clips WHERE id=?", (clip_id,))
+                self.db.execute("COMMIT")
+            except BaseException:
+                self.db.execute("ROLLBACK")
+                raise
+            for rel in (row["landmarks_path"], row["video_path"]):
+                self.clip_path(rel).unlink(missing_ok=True)
+
     def count_on(self, day: str) -> int:
         return self.db.execute("SELECT COUNT(*) FROM clips WHERE date=?", (day,)).fetchone()[0]
 
@@ -149,6 +170,25 @@ class Store:
             "SELECT negative_label, COUNT(*) n FROM clips WHERE kind='negative' GROUP BY negative_label")}
         total = self.db.execute("SELECT COUNT(*) FROM clips").fetchone()[0]
         return {"today": self.count_on(today), "total": total, "per_phrase": per, "negatives": neg}
+
+    def add_prediction(self, **v) -> str:
+        pid = uuid.uuid4().hex
+        with self._lock:
+            self.db.execute(
+                "INSERT INTO predictions(id,created_at,date,clip_id,model_version,model_kind,top3_json,distance,rejected,agree,"
+                "chosen,outcome,correct_top1,correct_top3,latency_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (pid, datetime.now(timezone.utc).isoformat(timespec="seconds"), self.today(), v.get("clip_id"),
+                 v.get("model_version"), v.get("model_kind"), v.get("top3_json"), v.get("distance"), v.get("rejected"),
+                 v.get("agree"), v.get("chosen"), v["outcome"], v.get("correct_top1"), v.get("correct_top3"), v.get("latency_ms")))
+        return pid
+
+    def real_use_by_day(self) -> list[dict]:
+        """実使用（認識画面で選ばれた結果）の、日ごとの正解率。"""
+        rows = self.db.execute(
+            "SELECT date, COUNT(*) n, SUM(correct_top1) top1, SUM(correct_top3) top3, SUM(rejected) rejected "
+            "FROM predictions WHERE outcome='phrase' GROUP BY date ORDER BY date").fetchall()
+        return [{"date": r["date"], "n": r["n"], "top1": r["top1"] or 0, "top3": r["top3"] or 0, "rejected": r["rejected"] or 0}
+                for r in rows]
 
     def clip_rows(self) -> list[sqlite3.Row]:
         return self.db.execute("SELECT * FROM clips ORDER BY created_at").fetchall()

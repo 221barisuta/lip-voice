@@ -7,7 +7,7 @@ def open_source(s: Settings) -> FrameSource:
     src = s.camera_source.strip()
     if src.isdigit():
         from .opencv_backend import CameraSource
-        return CameraSource(int(src), s.camera_width, s.camera_height, s.camera_fps)
+        return CameraSource(int(src), s.camera_width, s.camera_height, s.camera_fps, s.camera_backend)
     from .file_backend import FileSource
     return FileSource(src, s.camera_width, s.camera_height)
 
