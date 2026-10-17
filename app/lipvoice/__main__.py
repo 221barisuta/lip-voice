@@ -231,7 +231,17 @@ def cmd_run(args) -> int:
     return 0
 
 
+def _safe_streams() -> None:
+    """Windows でコンソール以外（パイプ・ファイル）に日本語を出すと、文字コードで落ちることがある。落ちずに出す。"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main() -> None:
+    _safe_streams()
     ap = argparse.ArgumentParser(prog="lipvoice")
     ap.add_argument("--home", help="データの置き場所（既定: ~/LipVoice）")
     ap.add_argument("--profile", default="default", help="利用者ごとのフォルダ名")

@@ -94,3 +94,13 @@ def test_active_threshold_setting_is_clamped_and_saved(tmp_path):
     assert h.update({"active_threshold": 0.004}).active_threshold == 0.004
     assert h.update({"active_threshold": 5}).active_threshold == 0.05
     assert SettingsHolder(tmp_path / "config.json").get().active_threshold == 0.05
+
+
+def test_main_survives_a_narrow_stdout_encoding(tmp_path):
+    """Windows の cp1252 のパイプで、日本語のヘルプを出しても落ちない（CI の Windows で見つかった不具合）。"""
+    import os
+    import subprocess
+    import sys
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0", "LIPVOICE_HOME": str(tmp_path)}
+    r = subprocess.run([sys.executable, "-m", "lipvoice", "--help"], capture_output=True, env=env)
+    assert r.returncode == 0 and b"lipvoice" in r.stdout
