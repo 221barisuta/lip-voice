@@ -9,6 +9,7 @@ from pathlib import Path
 # 設定ごとの許容範囲（画面のスライダーにも使う）
 LIMITS: dict[str, tuple[float, float]] = {
     "threshold": (0.002, 0.05),     # 口の開きの変動幅（目尻間の距離を 1 とした値）
+    "active_threshold": (0.002, 0.05),   # 学習・認識で「口が動いている区間」を切り出す閾値
     "still_sec": (0.5, 3.0),        # 止まってから録画を終えるまで
     "max_sec": (3.0, 30.0),         # 最大の録画時間
     "session_minutes": (1.0, 60.0),
@@ -27,6 +28,8 @@ class Settings:
     threshold: float = 0.01
     still_sec: float = 1.0
     max_sec: float = 10.0
+    # 学習・認識の特徴の切り出しに使う閾値（校正で threshold と一緒に更新する）。モデルには、学習時の値が保存される
+    active_threshold: float = 0.01
     # 収集セッション
     session_minutes: float = 5.0
     min_detected_ratio: float = 0.7      # 検出できたフレームの割合がこれ未満なら保存させない

@@ -10,6 +10,7 @@ from pathlib import Path
 import cv2
 
 from .capture import open_source
+from .calibrate import Calibration
 from .collect import CollectSession, StateError
 from .recording.controller import RecordingController
 from .vision.crop import MouthCropper
@@ -55,6 +56,7 @@ class Engine:
         self._want_full_preview = False
         self._start_flag = False
         self._pending_cfg: StillnessConfig | None = None
+        self.calibration = Calibration()
 
     # ---- 外からの操作 ----
     def start(self) -> None:
@@ -67,6 +69,13 @@ class Engine:
         if self._thread:
             self._thread.join(timeout=5)
         return not (self._thread and self._thread.is_alive())
+
+    def start_calibration(self, phase: str, seconds: float) -> None:
+        """閾値の校正の測定を始める（静止 → 口パク）。測る窓は設定の still_sec。"""
+        self.calibration.start(phase, seconds, self._settings().still_sec)
+
+    def calibration_state(self) -> dict:
+        return self.calibration.snapshot()
 
     def snapshot(self) -> LiveState:
         with self._lock:
@@ -167,6 +176,7 @@ class Engine:
             cropper.update(geom)
             crop = cropper.crop(image)
             live.push(frame.t, indicators)
+            self.calibration.feed(frame.t, live.range if det is not None else None)
 
             if self._start_flag:                     # API からの録画開始の要求
                 self._start_flag = False

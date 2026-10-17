@@ -1,0 +1,18 @@
+{
+  "threshold": 0.01,
+  "active_threshold": 0.01,
+  "still_sec": 1.5,
+  "max_sec": 15.0,
+  "session_minutes": 5.0,
+  "min_detected_ratio": 0.7,
+  "camera_source": "0",
+  "camera_width": 640,
+  "camera_height": 480,
+  "camera_fps": 30,
+  "camera_backend": "any",
+  "camera_rotate": 0,
+  "idle_fps": 10,
+  "timezone": "Asia/Tokyo",
+  "date_override": "",
+  "auto_save": false
+}

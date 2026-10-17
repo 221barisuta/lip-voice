@@ -85,3 +85,12 @@ def test_settings_sanitize():
     s = sanitize({"threshold": 5, "still_sec": 0, "max_sec": "x", "max_phrases": -3, "negative_kinds": ["a", " ", "b"]})
     assert s.threshold == 0.05 and s.still_sec == 0.5 and s.max_sec == 10.0
     assert s.max_phrases == 0 and s.negative_kinds == ["a", "b"]
+
+
+def test_active_threshold_setting_is_clamped_and_saved(tmp_path):
+    from lipvoice.settings import SettingsHolder
+    h = SettingsHolder(tmp_path / "config.json")
+    assert h.get().active_threshold == 0.01
+    assert h.update({"active_threshold": 0.004}).active_threshold == 0.004
+    assert h.update({"active_threshold": 5}).active_threshold == 0.05
+    assert SettingsHolder(tmp_path / "config.json").get().active_threshold == 0.05

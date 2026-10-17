@@ -1,0 +1,2 @@
+[console_scripts]
+lipvoice = lipvoice.__main__:main

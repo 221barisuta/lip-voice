@@ -50,3 +50,7 @@ LipVoice/
 *.db-wal
 *.db-shm
 *.json.gz
+
+# Windows 導入パッケージの作業フォルダ
+release/
+release-cache/

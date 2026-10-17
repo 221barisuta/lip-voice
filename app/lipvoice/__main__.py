@@ -87,7 +87,7 @@ def cmd_train(args) -> int:
     from .ml.features import FeatureConfig
     from .ml.train import run_training
     p, holder, store = _store(args)
-    cfg = FeatureConfig(use_duration=args.use_duration)
+    cfg = FeatureConfig(use_duration=args.use_duration, active_threshold=holder.get().active_threshold)
     rep = run_training(store, p, cfg, epochs=args.epochs, seed=args.seed, use_cnn=not args.no_cnn,
                        sources=tuple(args.sources.split(",")), activate=not args.no_activate, force_active=args.active)
     print(f"学習済みモデル: {rep['version']}（使うモデル: {rep['active']}）  {rep['seconds']} 秒")
@@ -114,81 +114,14 @@ def cmd_models(args) -> int:
 
 
 def cmd_bench(args) -> int:
-    """実機（患者さんの PC）での Day 0 の確認。顔の検出率、fps、1 フレームの処理時間、顔の傾き、静止時の口の動きのノイズを測る。
-    測っている間は、カメラの正面で、口を閉じて（または楽にして）静止してください。"""
-    import statistics
-    import time
-
-    from .capture import open_source
+    """実機（患者さんの PC）での Day 0 の確認（処理は bench.py）。"""
+    from .bench import run
     from .settings import SettingsHolder
-    from .vision.crop import MouthCropper
-    from .vision.geometry import Landmarks, mouth_geometry, mouth_opening, mouth_width_ratio
-    from .vision.landmarker import FaceDetector
-    from .vision.stillness import StillnessConfig, StillnessDetector
-
     p = _paths(args)
     holder = SettingsHolder(p.config)
     if args.source:
         holder.update({"camera_source": args.source})
-    if not p.model_file.exists():
-        print("モデルがありません。先に: lipvoice fetch-models")
-        return 1
-    s = holder.get()
-    src = open_source(s)
-    det = FaceDetector(p.model_file, s.face_detection_confidence, s.face_presence_confidence, s.tracking_confidence)
-    cropper, live = MouthCropper(), StillnessDetector(StillnessConfig(float("inf"), 1.0, float("inf")))
-    detect_ms, other_ms, tilts, rolls, noise, found = [], [], [], [], [], 0
-    cpu0, wall0 = time.process_time(), time.perf_counter()
-    while time.perf_counter() - wall0 < args.seconds:
-        fr = src.read()
-        if fr is None:
-            continue
-        t = time.perf_counter()
-        img = fr.image
-        d = det.detect(img, fr.t * 1000)
-        detect_ms.append((time.perf_counter() - t) * 1000)
-        t = time.perf_counter()
-        if d is not None:
-            found += 1
-            h, w = img.shape[:2]
-            lm = Landmarks(d.points)
-            g = mouth_geometry(lm, w, h)
-            live.push(fr.t, (mouth_opening(lm, w, h), mouth_width_ratio(lm, w, h)))
-            if time.perf_counter() - wall0 > 3:           # 最初の 3 秒は落ち着くまで除く
-                noise.append(live.range)
-            cropper.update(g)
-            cropper.crop(img)
-            if d.tilt_deg is not None:
-                tilts.append(d.tilt_deg)
-                rolls.append(abs(d.roll_deg or 0.0))
-        other_ms.append((time.perf_counter() - t) * 1000)
-    wall, cpu = time.perf_counter() - wall0, time.process_time() - cpu0
-    desc = src.description
-    src.close()
-    det.close()
-    n = len(detect_ms)
-    q = lambda xs, f: sorted(xs)[min(len(xs) - 1, int(len(xs) * f))]
-    fps, ratio = n / wall, found / max(n, 1)
-    print(f"{desc}: {n} フレーム / {wall:.1f} 秒 = {fps:.1f} fps（顔を検出できた割合 {ratio:.0%}）")
-    print(f"顔検出  平均 {statistics.mean(detect_ms):.1f} ms / 95% {q(detect_ms, .95):.1f} ms")
-    print(f"その他（口の計算・切り出し） 平均 {statistics.mean(other_ms):.2f} ms")
-    print(f"このプログラムの CPU 使用: 1 コア換算で {cpu / wall:.0%}（カメラが 30fps なら、実運用ではこれ以下）")
-    tilt = statistics.median(tilts) if tilts else None
-    roll = statistics.median(rolls) if rolls else None
-    floor = q(noise, .95) if noise else None
-    if tilt is not None:
-        print(f"顔の正面からの傾き（中央値）{tilt:.0f}°、画像の中での回転 {roll:.0f}°（検出器の守備範囲は約 45° 以内）")
-    if floor is not None:
-        print(f"静止時の口の動き（ノイズ）95% {floor:.4f}（録画の閾値の初期値 0.01 はこれより十分大きい必要があります）")
-    ok = lambda v: "OK" if v else "要対応"
-    print("--- Day 0 の目安 ---")
-    print(f"検出率 95% 以上: {ok(ratio >= 0.95)} / fps 15 以上: {ok(fps >= 15)} / 顔検出 50ms 以下: {ok(q(detect_ms, .95) <= 50)}"
-          + (f" / 傾き 35° 以下: {ok(tilt <= 35)}" if tilt is not None else "")
-          + (f" / 回転 35° 以下: {ok(roll <= 35)}" if roll is not None else "")
-          + (f" / ノイズ 0.005 以下: {ok(floor <= 0.005)}" if floor is not None else ""))
-    if ratio < 0.5 and roll is None:
-        print("顔がほとんど検出できません。カメラの向き（上下逆なら camera_rotate を 180 に）、角度、明るさ、遮蔽を確認してください")
-    return 0
+    return run(p, holder.get(), args.seconds, args.speech_seconds)
 
 
 def _lower_priority() -> None:
@@ -286,7 +219,8 @@ def main() -> None:
     md.add_argument("--activate", help="この版を使う")
     md.set_defaults(fn=cmd_models)
     b = sub.add_parser("bench", help="1 フレームあたりの処理時間を測る（実機での負荷の確認用）")
-    b.add_argument("--seconds", type=float, default=20)
+    b.add_argument("--seconds", type=float, default=20, help="静止の測定の秒数")
+    b.add_argument("--speech-seconds", type=float, default=10, help="口パクの測定の秒数（0 で省略）")
     b.add_argument("--source", help="カメラ番号、または動画ファイル")
     b.set_defaults(fn=cmd_bench)
     args = ap.parse_args()

@@ -14,7 +14,7 @@
 詳細は [docs/spec.md](docs/spec.md)。以前の Google ログイン + Cloud Run 版は、コミット `e83e7e7` までの履歴に残っている。
 
 ## セットアップ（開発: Mac / Linux）
-Python 3.10 以上、Node 22 以上が必要。
+Python 3.12 以上（3.13 を推奨）、Node 22 以上が必要。
 Mac で `node -v` が 22 未満のときは、そのターミナルで `export PATH="/opt/homebrew/opt/node@22/bin:$PATH"; hash -r` を実行してから `setup-dev.sh` を実行する（`~/.zshrc` に node@20 が書いてあると、新しいターミナルでは元に戻る）。
 ```
 scripts/setup-dev.sh          # Python の環境、画面のビルド、顔検出モデルの取得
@@ -22,7 +22,7 @@ app/.venv/bin/lipvoice run --open
 ```
 - カメラの番号を調べる: `lipvoice cameras`。指定して起動: `lipvoice run --source 1`
 - 動画ファイルをカメラの代わりに使う（試験用）: `lipvoice run --source 動画.mp4`
-- 実機の確認（Day 0）: `lipvoice bench --seconds 20`（顔の検出率・fps・処理時間・顔の傾き・静止時のノイズ）
+- 実機の確認（Day 0）: `lipvoice bench`（1 段目: 静止 20 秒で顔の検出率・fps・処理時間・傾き・ノイズ、2 段目: 口パク 10 秒で SNR と閾値の候補。結果は `logs/bench-*.json`）。手順は [docs/day0-checklist.md](docs/day0-checklist.md)
 - データの整合性を検査する: `lipvoice check`（`--repair` で孤児ファイルを退避）
 - Mac では初回に、ターミナル（または使っているアプリ）にカメラの許可を出す
 
@@ -39,6 +39,15 @@ app/.venv/bin/lipvoice --profile test run --open         # 収集・認識・評
 6. 試験が終わったら、撮影日の上書きと自動保存を**オフ（空）に戻す**。実際の収集は別のプロフィール（`--profile patient` など）で行う
 
 合成データで流れだけ確かめる（収集不要）: `lipvoice --profile synth synth` → `lipvoice --profile synth train`
+
+## 患者さんの PC（Windows 11）への導入
+```
+scripts/make-release.sh            # Mac で。release/lipvoice-win-<版>.zip（約 140MB）ができる
+```
+zip を USB で PC に持っていき、展開して `install.cmd` を実行する（管理者権限は不要。VC++ ランタイムが無い PC だけ許可を求める）。
+専用の Python・依存・顔検出モデルを `C:\LipVoice` に入れ、デスクトップに `LipVoice` と `LipVoice check (bench)` ができる。導入時にネットは要らない。
+消すときは `C:\LipVoice` とショートカットを削除するだけ。確認の手順は [docs/day0-checklist.md](docs/day0-checklist.md)。
+Windows 実機での動作は未確認（GitHub Actions の windows-latest でテストと、wheel だけでのオフライン導入を確認する）。
 
 ## 実際の収集（患者さん本人の PC。特徴点だけを保存）
 - スペースキーを押して離すと録画が始まり、口が止まって 1 秒（または 10 秒）で自動で終わる。Enter＝保存、Backspace＝撮り直し、Esc＝中止。大きなボタンも使える
