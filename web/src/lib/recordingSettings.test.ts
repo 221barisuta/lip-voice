@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, sanitize } from "./collectSettings";
+import { DEFAULT_SETTINGS, sanitize } from "./recordingSettings";
 
 describe("sanitize", () => {
   it("空なら初期値", () => expect(sanitize({})).toEqual(DEFAULT_SETTINGS));

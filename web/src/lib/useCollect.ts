@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ClipStats, RecordedClip } from "../types/clip";
 import type { Phrase } from "../types/phrase";
 import { getClipStats, getPhrases, postClip } from "./api";
-import type { CollectSettings } from "./collectSettings";
+import type { RecordingSettings } from "./recordingSettings";
 import { PhraseQueue } from "./phraseQueue";
 
 export type Phase = "loading" | "idle" | "recording" | "review" | "saving" | "ended";
@@ -11,7 +11,7 @@ export const SESSION_MS = 5 * 60 * 1000;   // 仕様 7.1: 1 セッション最�
 export const MIN_DETECTED_RATIO = 0.7;     // これ未満は顔が写っていないとみなし保存させない
 
 interface Camera {
-  record: (cfg: CollectSettings) => Promise<RecordedClip>;
+  record: (cfg: RecordingSettings) => Promise<RecordedClip>;
   faceFound: boolean;
 }
 
@@ -28,7 +28,7 @@ export const unsavableReason = (c: RecordedClip) =>
  * データ収集の進行（表示 → スペースを離して録画 → 口が止まる/最大秒数で終了 → 保存/撮り直し → 次へ）。
  * 録画の終了条件は settings（口が止まったとみなす閾値・静止秒数・最大秒数）。
  */
-export function useCollect(camera: Camera, cameraReady: boolean, settings: CollectSettings) {
+export function useCollect(camera: Camera, cameraReady: boolean, settings: RecordingSettings) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [phrase, setPhrase] = useState<Phrase | null>(null);

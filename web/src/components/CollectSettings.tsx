@@ -1,4 +1,4 @@
-import { SETTING_LIMITS, type CollectSettings as Settings } from "../lib/collectSettings";
+import { SETTING_LIMITS, type RecordingSettings as Settings } from "../lib/recordingSettings";
 
 interface Props {
   value: Settings;

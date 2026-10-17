@@ -4,7 +4,7 @@ import { CameraView } from "../components/CameraView";
 import { CollectSettings } from "../components/CollectSettings";
 import { CollectStats } from "../components/CollectStats";
 import { PhraseCard } from "../components/PhraseCard";
-import { loadSettings, saveSettings, type CollectSettings as Settings } from "../lib/collectSettings";
+import { loadSettings, saveSettings, type RecordingSettings as Settings } from "../lib/recordingSettings";
 import { useForegroundKeys } from "../lib/foregroundKeys";
 import { isSavable, unsavableReason, useCollect } from "../lib/useCollect";
 import { useMouthCamera } from "../lib/useMouthCamera";
