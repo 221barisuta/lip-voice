@@ -113,6 +113,54 @@ def cmd_models(args) -> int:
     return 0
 
 
+def _transfer_error(fn):
+    from .transfer import TransferError
+    try:
+        return fn()
+    except TransferError as e:
+        print(f"中止しました: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_export(args) -> int:
+    from . import transfer
+    from .settings import SettingsHolder
+    p = _paths(args)
+    if not p.db.exists():
+        print("このプロフィールにはデータがありません")
+        return 1
+
+    def go():
+        out = transfer.export(p, SettingsHolder(p.config).get(), Path(args.out), with_video=args.with_video,
+                              models=not args.no_models, db=not args.models_only, force=args.force)
+        print(f"書き出しました: {out}")
+        return 0
+    return _transfer_error(go)
+
+
+def cmd_import(args) -> int:
+    from . import transfer
+
+    def go():
+        t = transfer.import_profile(Path(args.src), home_dir() if not args.home else Path(args.home).expanduser(), args.as_profile)
+        print(f"取り込みました: {t.root}（確認: lipvoice --profile {t.profile} check）")
+        return 0
+    return _transfer_error(go)
+
+
+def cmd_import_models(args) -> int:
+    from . import transfer
+    p = _paths(args)
+
+    def go():
+        added = transfer.import_models(Path(args.src), p, activate=args.activate)
+        print(f"追加したモデル: {', '.join(added) or '（すべて取り込み済み）'}"
+              + ("。使うモデルに設定しました" if args.activate else "。使うには lipvoice models --activate <版>"))
+        print("起動中の場合は、LipVoice を再起動してください")
+        return 0
+    return _transfer_error(go)
+
+
 def cmd_bench(args) -> int:
     """実機（患者さんの PC）での Day 0 の確認（処理は bench.py）。"""
     from .bench import run
@@ -218,6 +266,21 @@ def main() -> None:
     md = sub.add_parser("models", help="学習済みモデルの版の一覧・切り替え（ロールバック）")
     md.add_argument("--activate", help="この版を使う")
     md.set_defaults(fn=cmd_models)
+    ex = sub.add_parser("export", help="データを 1 つのフォルダにまとめて書き出す（USB での持ち出し用）")
+    ex.add_argument("out", help="書き出し先のフォルダ（この中に lipvoice-export-... ができる）")
+    ex.add_argument("--with-video", action="store_true", help="口元の動画も含める（既定は特徴点だけ）")
+    ex.add_argument("--no-models", action="store_true")
+    ex.add_argument("--models-only", action="store_true", help="モデルだけを書き出す（Mac → 患者さんの PC）")
+    ex.add_argument("--force", action="store_true", help="試験用の撮影日の上書きが設定されていても書き出す")
+    ex.set_defaults(fn=cmd_export)
+    im = sub.add_parser("import", help="書き出したフォルダを、空のプロフィールに取り込む（--home の下に作る）")
+    im.add_argument("src")
+    im.add_argument("--as-profile", help="取り込み先のプロフィール名（既定: 書き出し元と同じ）")
+    im.set_defaults(fn=cmd_import)
+    imm = sub.add_parser("import-models", help="書き出したフォルダから、学習済みモデルの版だけを追加する")
+    imm.add_argument("src")
+    imm.add_argument("--activate", action="store_true", help="取り込んだ最新の版を使う")
+    imm.set_defaults(fn=cmd_import_models)
     b = sub.add_parser("bench", help="1 フレームあたりの処理時間を測る（実機での負荷の確認用）")
     b.add_argument("--seconds", type=float, default=20, help="静止の測定の秒数")
     b.add_argument("--speech-seconds", type=float, default=10, help="口パクの測定の秒数（0 で省略）")

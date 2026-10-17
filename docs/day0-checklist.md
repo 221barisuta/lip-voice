@@ -71,5 +71,7 @@
 - 認識画面で選ぶ使い方（実使用）でもデータは貯まる。収集が負担なら、そちらを中心にしてよい
 
 ## 9. 持ち出し（Mac での学習）
-- 最初の 2〜3 日は、LipVoice を止めて、`C:\LipVoice\data\patient` フォルダをそのまま USB にコピーし、Mac で `lipvoice --home <コピー先> --profile patient check` で確認する
-- 学習したモデル（`models/<版>`）を PC に戻す方法は、`lipvoice import-models`（実装後に案内）
+- 患者さんの PC: `LipVoice` を終了してから（起動中でも可）、`C:\LipVoice\venv\Scripts\lipvoice.exe --home C:\LipVoice\data --profile patient export <USB のドライブ>:\`
+- Mac: `lipvoice --home ~/LipVoice-patient import <USB 内の lipvoice-export-patient-...>` → `lipvoice --home ~/LipVoice-patient --profile patient check` → 学習 `train`
+- 学習したモデルを戻す: Mac で `export <USB> --models-only --force` → PC で `import-models <USB 内のフォルダ> --activate` → LipVoice を再起動
+- USB は暗号化（BitLocker To Go）し、Mac での保管期間と削除の方法を、同意の説明に含める。使い終わった書き出しは USB から削除する

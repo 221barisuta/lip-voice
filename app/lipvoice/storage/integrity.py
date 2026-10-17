@@ -23,6 +23,8 @@ def check(store: Store, repair: bool = False) -> Report:
     known: set[str] = set()
     for r in store.clip_rows():
         for rel in (r["landmarks_path"], r["video_path"]):
+            if not rel:                                        # 動画なしで取り込んだクリップ
+                continue
             known.add(rel)
             if not (root / rel).exists():
                 rep.missing_files.append(r["id"])

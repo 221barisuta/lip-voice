@@ -157,7 +157,8 @@ class Store:
                 self.db.execute("ROLLBACK")
                 raise
             for rel in (row["landmarks_path"], row["video_path"]):
-                self.clip_path(rel).unlink(missing_ok=True)
+                if rel:
+                    self.clip_path(rel).unlink(missing_ok=True)
 
     def count_on(self, day: str) -> int:
         return self.db.execute("SELECT COUNT(*) FROM clips WHERE date=?", (day,)).fetchone()[0]
@@ -212,6 +213,8 @@ class Store:
         row = self.db.execute("SELECT video_path FROM clips WHERE id=?", (clip_id,)).fetchone()
         if row is None:
             raise ValueError("クリップが見つかりません")
+        if not row["video_path"]:
+            raise ValueError("動画は含まれていません")
         return self.clip_path(row["video_path"])
 
     def clip_rows(self) -> list[sqlite3.Row]:

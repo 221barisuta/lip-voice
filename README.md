@@ -59,6 +59,18 @@ Windows 実機での動作は未確認（GitHub Actions の windows-latest で�
 - `lipvoice models`: 版の一覧。`lipvoice models --activate <版>` でロールバック
 - 評価は撮影日で分ける（ランダムに分けない）。日付が 1 日分しかないと評価できない
 
+## データの持ち出し・取り込み（患者さんの PC ⇄ Mac）
+```
+lipvoice --home C:\LipVoice\data --profile patient export E:\                 # 患者さんの PC → USB（特徴点のみ。--with-video で口元動画も）
+lipvoice --home ~/LipVoice-patient import /Volumes/USB/lipvoice-export-patient-...    # Mac で、空のプロフィールに取り込む（--as-profile で名前を変える）
+lipvoice --profile patient export /Volumes/USB --models-only --force                  # Mac で学習したモデルだけを書き出す
+lipvoice --home C:\LipVoice\data --profile patient import-models E:\lipvoice-export-... --activate   # PC にモデルを追加して使う
+```
+- 書き出しは、起動中でもよい（SQLite の backup で整合したスナップショット）。`manifest.json`（各ファイルの SHA-256）を最後に書き、取り込み時に全ファイルを検証する。壊れた・余分な・不正なパスのファイルがあれば、取り込まない
+- 取り込みは、空のプロフィールにだけ。すでにデータがあるプロフィールには入れない（上書きしない）。モデルの追加（`import-models`）も、同じ名前の別内容の版は拒否する
+- 試験用の撮影日の上書きが設定されたままだと、書き出さない（`--force` で許可）。取り込む設定からは、試験用・この PC 固有の値（撮影日の上書き、自動保存、カメラ）を除く
+- 口元の動画は、既定では含めない（学習は特徴点だけを使う）。顔由来のデータなので、USB は BitLocker To Go などで暗号化することを勧める
+
 ## データの置き場所
 `~/LipVoice/<プロフィール>/`（`LIPVOICE_HOME` と `--profile` で変更）。中身は `config.json`、`lipvoice.db`、`clips/`、`models/`。
 1 クリップは約 200KB（250 本で約 50MB）。開発者のテストデータと本人のデータは、別のプロフィールにする。
