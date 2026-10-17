@@ -54,3 +54,5 @@ LipVoice/
 # Windows 導入パッケージの作業フォルダ
 release/
 release-cache/
+app/build/
+*.egg-info/
