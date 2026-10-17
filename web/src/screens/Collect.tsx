@@ -51,6 +51,7 @@ export function Collect() {
         <NavBar />
         <h1>セッション終了（{Math.round(c.session_total_sec / 60)}分）。おつかれさまでした</h1>
         <CollectStats stats={c.stats} phrases={c.phrases} />
+        <CollectSettings liveRange={snap.live.live_range} disabled={false} />
         <BigButton tone="primary" onClick={act(api.newSession)}>新しいセッションを始める</BigButton>
       </main>
     );
