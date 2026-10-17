@@ -14,7 +14,7 @@ jobs:
         with: { node-version: "22" }
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libgles2 libgl1
       - run: cd app && pip install -c constraints.txt -e ".[dev]" && python -m pytest -q
-      - run: cd web && npm ci && npm run typecheck && npm test --if-present
+      - run: cd web && npm ci && npm run typecheck && npm test
 
   windows:
     # Windows で、(1) テストが通ること (2) 導入パッケージと同じ手順（wheel だけでオフライン導入）で入ることを確かめる
@@ -27,11 +27,14 @@ jobs:
       - name: offline install smoke test
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+          function Run($exe, $cmdArgs) { & $exe @cmdArgs; if ($LASTEXITCODE -ne 0) { throw "failed: $exe $cmdArgs" } }
           New-Item -ItemType Directory wheels | Out-Null
-          python -m pip wheel --no-deps -w wheels app
-          python -m pip download -c app/constraints.txt -d wheels numpy mediapipe av fastapi uvicorn python-multipart tzdata colorama
-          python -m venv smoke
-          .\smoke\Scripts\python.exe -m pip install --no-index --find-links wheels lipvoice
-          .\smoke\Scripts\lipvoice.exe --help
+          Run python @("-m", "pip", "wheel", "--no-deps", "-w", "wheels", "./app")
+          Get-ChildItem wheels
+          Run python @("-m", "pip", "download", "-c", "app/constraints.txt", "-d", "wheels", "numpy", "mediapipe", "av", "fastapi", "uvicorn", "python-multipart", "tzdata", "colorama")
+          Run python @("-m", "venv", "smoke")
+          Run ".\smoke\Scripts\python.exe" @("-m", "pip", "install", "--no-index", "--find-links", "wheels", "lipvoice")
+          Run ".\smoke\Scripts\lipvoice.exe" @("--help")
           $env:LIPVOICE_HOME = "$PWD\smoke-home"
-          .\smoke\Scripts\lipvoice.exe --profile smoke check
+          Run ".\smoke\Scripts\lipvoice.exe" @("--profile", "smoke", "check")
