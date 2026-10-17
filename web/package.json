@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "prepare-assets": "node scripts/prepare-assets.mjs",
     "dev": "npm run prepare-assets && VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000} vite --mode dev",
