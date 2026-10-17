@@ -61,10 +61,12 @@ class Engine:
         self._thread = threading.Thread(target=self._run, name="engine", daemon=True)
         self._thread.start()
 
-    def stop(self) -> None:
+    def stop(self) -> bool:
+        """止める。取得の処理が終わらない（カメラの許可待ちなど）時は False を返す。"""
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=5)
+        return not (self._thread and self._thread.is_alive())
 
     def snapshot(self) -> LiveState:
         with self._lock:

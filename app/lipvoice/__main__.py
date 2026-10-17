@@ -237,10 +237,16 @@ def cmd_run(args) -> int:
         import webbrowser
         webbrowser.open(url)
     try:
-        uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+        # 画面を開いたまま Ctrl+C しても止まるように、接続の待ち時間を短くする（常時つながる配信があるため）
+        uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning", timeout_graceful_shutdown=2)
     finally:
-        engine.stop()
+        stopped = engine.stop()
         store.close()
+        if not stopped:
+            # カメラの処理が戻ってこない時（許可待ちなど）に、プロセスが残らないよう終了する。データは閉じ済み
+            sys.stdout.flush()
+            sys.stderr.flush()
+            os._exit(0)
     return 0
 
 
