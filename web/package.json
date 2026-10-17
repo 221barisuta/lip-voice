@@ -7,16 +7,12 @@
     "node": ">=22"
   },
   "scripts": {
-    "prepare-assets": "node scripts/prepare-assets.mjs",
-    "dev": "npm run prepare-assets && VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000} vite --mode dev",
-    "dev:emulator": "npm run prepare-assets && vite --mode emulator",
-    "build": "npm run prepare-assets && tsc --noEmit && vite build --mode ${APP_ENV:-dev}",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@mediapipe/tasks-vision": "^1.1.0",
-    "firebase": "^12.19.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.6"

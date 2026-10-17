@@ -1,39 +1,61 @@
-import type { ClipStats, RecordedClip } from "../types/clip";
-import type { Phrase } from "../types/phrase";
-import { getIdToken } from "./auth";
+import type { Snapshot } from "../types/live";
 
-const BASE = import.meta.env.VITE_API_BASE_URL as string;
+/** トークンは、Python が画面を配信する時だけ HTML に埋め込む（他のサイトは読めない）。 */
+const token = (): string =>
+  document.querySelector('meta[name="lipvoice-token"]')?.getAttribute("content") ??
+  (import.meta.env.VITE_LIPVOICE_TOKEN as string | undefined) ??
+  "";
 
-async function request(path: string, init: RequestInit = {}): Promise<Response> {
-  const token = await getIdToken();
-  const res = await fetch(`${BASE}${path}`, {
+export class ApiError extends Error {}
+
+async function raw(path: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(path, {
     ...init,
-    headers: { ...init.headers, Authorization: `Bearer ${token}` },
+    headers: { "X-LipVoice-Token": token(), ...(init.body ? { "Content-Type": "application/json" } : {}), ...init.headers },
   });
-  if (!res.ok) throw new Error(`API エラー ${res.status}`);
+  if (!res.ok) {
+    let detail = `エラー ${res.status}`;
+    try {
+      detail = (await res.json()).detail ?? detail;
+    } catch {
+      /* 本文が JSON でない */
+    }
+    throw new ApiError(detail);
+  }
   return res;
 }
 
-export async function getPhrases(): Promise<Phrase[]> {
-  const res = await request("/phrases");
-  return (await res.json()).phrases;
-}
+const json = async <T>(path: string, init?: RequestInit): Promise<T> => (await raw(path, init)).json();
+const post = <T>(path: string, body?: unknown) =>
+  json<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
 
-export async function getClipStats(): Promise<ClipStats> {
-  return (await request("/clips/stats")).json();
-}
+export const api = {
+  start: () => post("/api/collect/start"),
+  save: () => post("/api/collect/save"),
+  discard: () => post("/api/collect/discard"),
+  newSession: () => post("/api/collect/session"),
+  setMode: (mode: "phrase" | "negative", negative_label?: string) => post("/api/collect/mode", { mode, negative_label }),
+  preview: (full: boolean) => post("/api/preview", { full }),
+  settings: <T>() => json<T>("/api/settings"),
+  putSettings: <T>(changes: Record<string, unknown>) => json<T>("/api/settings", { method: "PUT", body: JSON.stringify(changes) }),
+  pendingVideo: async (): Promise<Blob> => (await raw("/api/collect/pending/video")).blob(),
+};
 
-export async function postClip(
-  clip: RecordedClip,
-  phraseId: string,
-  sessionId: string,
-): Promise<{ clip_id: string }> {
-  const form = new FormData();
-  form.append(
-    "meta",
-    JSON.stringify({ ...clip.meta, phrase_id: phraseId, session_id: sessionId, source: "collect" }),
-  );
-  form.append("landmarks", clip.landmarks, "landmarks.json");
-  form.append("video", clip.video, "mouth.webm");
-  return (await request("/clips", { method: "POST", body: form })).json();
+/** Server-Sent Events を fetch で読む（EventSource は独自ヘッダを付けられないため）。 */
+export async function streamEvents(onSnapshot: (s: Snapshot) => void, signal: AbortSignal): Promise<void> {
+  const res = await raw("/api/events", { signal });
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    buf += decoder.decode(value, { stream: true });
+    let i: number;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const line = buf.slice(0, i).split("\n").find((l) => l.startsWith("data: "));
+      buf = buf.slice(i + 2);
+      if (line) onSnapshot(JSON.parse(line.slice(6)));
+    }
+  }
 }

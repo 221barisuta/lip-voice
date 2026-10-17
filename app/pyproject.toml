@@ -1,0 +1,35 @@
+[project]
+name = "lipvoice"
+version = "0.2.0"
+description = "口パク（声なし）を読み取り、定型フレーズを音声にするローカルアプリ"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+  "opencv-python-headless>=4.9",
+  "mediapipe>=0.10.14",
+  "av>=12",
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "python-multipart>=0.0.9",
+  "tzdata",   # Windows でタイムゾーン（Asia/Tokyo）を使うために必要
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "httpx>=0.27"]
+train = ["torch"]   # 学習（段階B）のときだけ。推論は numpy のみ
+
+[project.scripts]
+lipvoice = "lipvoice.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["lipvoice*"]
+
+[tool.setuptools.package-data]
+lipvoice = ["static/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

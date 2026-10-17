@@ -35,10 +35,18 @@ Thumbs.db
 .vscode/
 .idea/
 
-# MediaPipe の配信用コピー（scripts/prepare-assets.mjs が生成）
-web/public/mediapipe/
 
 node_modules/
 
 # firebase emulator logs
 *-debug.log
+
+# ローカルアプリ（app/）
+app/.venv/
+app/lipvoice/static/
+LipVoice/
+*.npz
+*.db
+*.db-wal
+*.db-shm
+*.json.gz

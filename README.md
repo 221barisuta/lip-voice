@@ -1,72 +1,52 @@
 # lip-voice
 
-口パク（声を出さない口の動き）をカメラで読み取り、登録した定型フレーズを判定して音声で再生するウェブアプリ。
+口パク（声を出さない口の動き）をカメラで読み取り、登録した定型フレーズを判定して音声で再生するアプリ。
 声を失ったが口は動かせる人（気管切開後の ALS 患者など）が、自分のフレーズを自分専用のモデルで認識させることを目指す。
 
 ## 特徴
-- ブラウザだけで動く。インストール不要
-- Google ログイン。データ・モデル・フレーズは利用者ごとに完全分離
-- 顔全体の映像はブラウザの外に出さない（口元の切り出しと特徴点のみ送信）
-- 利用者自身のデータで学習し、口の動きの変化に合わせて再学習できる
+- **利用者の PC の中だけで動く。ネットがなくても動く**（初回に顔検出のモデルを取得するときだけネットが必要）
+- 顔全体の映像は PC の外に出さない。保存するのは口元の切り出しと特徴点だけ
+- 利用者のデータで学習し、口の動きの変化に合わせて再学習できる
+- データはプロフィールごとのフォルダに保存。バックアップは Google ドライブの同期フォルダへ（予定）
 
 ## 状態
-フェーズ1（検証版）の仕様策定が完了。実装はこれから。
-詳細は [docs/spec.md](docs/spec.md)。
+ステップ2a（収集基盤）まで実装済み。学習・評価・認識画面（2b）、バックアップ（2c）、常時監視と夜間アラート（ステップ3）はこれから。
+詳細は [docs/spec.md](docs/spec.md)。以前の Google ログイン + Cloud Run 版は、コミット `e83e7e7` までの履歴に残っている。
 
-## 構成
+## セットアップ（開発: Mac / Linux）
+Python 3.10 以上、Node 22 以上が必要。
 ```
-web/      フロント（React + Vite + TypeScript、MediaPipe Face Landmarker）
-server/   API（Python + FastAPI on Cloud Run）と学習コード（PyTorch）
-infra/    Firebase / Cloud Run 設定、Firestore / Storage セキュリティルール
-scripts/  配置スクリプト（dev / prod 切り替え）
-docs/     仕様書
+scripts/setup-dev.sh          # Python の環境、画面のビルド、顔検出モデルの取得
+app/.venv/bin/lipvoice run --open
 ```
+- カメラの番号を調べる: `lipvoice cameras`。指定して起動: `lipvoice run --source 1`
+- 動画ファイルをカメラの代わりに使う（試験用）: `lipvoice run --source 動画.mp4`
+- 1 フレームあたりの処理時間を測る（実機の負荷の確認）: `lipvoice bench --seconds 20`
+- データの整合性を検査する: `lipvoice check`（`--repair` で孤児ファイルを退避）
+- Mac では初回に、ターミナル（または使っているアプリ）にカメラの許可を出す
 
-## 初回セットアップ（dev）
-前提: Node 22.12 以上、Python 3.12 以上、`gcloud` と `firebase-tools`（`npx` で可）。
-
-1. 専用の GCP プロジェクトを作り、課金を有効にし、予算アラートを月1,000円で設定する
-2. [Firebase コンソール](https://console.firebase.google.com/)でそのプロジェクトに Firebase を追加し、Web アプリを登録して設定値を控える
-3. Authentication → Sign-in method で **Google を有効化**（サポートメールを設定）。OAuth 同意画面は Firebase が作る。外部公開の「テスト」状態なら、自分のアカウントをテストユーザーに追加する
-4. Authentication → Settings → 承認済みドメインに `<project>.web.app` と `<project>.firebaseapp.com` があることを確認（通常は自動）
-5. `.env.dev.example` をコピーして `.env.dev` を作り、値を埋める（`ALLOWED_EMAILS` に自分のメールを入れる）
-6. `gcloud auth login` と `firebase login` を済ませ、`scripts/deploy.sh dev` を実行
-7. 自分で一度ログインしてアカウントができたら、Authentication → Settings → ユーザーの操作 →
-   **「作成（登録）を有効にする」をオフ**にする（第三者のアカウント作成を防ぐ。サーバー側も `ALLOWED_EMAILS` で絞っている）
-
-Firestore とバケットのリージョンは作成後に変更できない。dev は Firestore が nam5、バケットが us-east1 のため、Cloud Run も `us-east1` にする（`GCP_REGION`）。prod は作成前に場所を決めること（データの所在は同意文にも書く）。
-
-## ローカル開発（dev の実プロジェクトに接続）
+## 収集の手順（フェーズ1: 開発者の顔で Mac から）
 ```
-gcloud auth application-default login          # 初回のみ（サーバーが Firestore / GCS に入るための認証）
-gcloud auth application-default set-quota-project <GCP_PROJECT_ID>
-scripts/dev-server.sh                          # API を http://localhost:8000 で起動（.env.dev を読む）
-cd web && npm ci && npm run dev                # 画面を http://localhost:5173 で起動
+app/.venv/bin/lipvoice --profile developer run --open
 ```
-Google ログインのポップアップは `localhost` が承認済みドメインなら動く（Firebase の既定）。
-サービスアカウントの鍵ファイルは作らない（ADC を使う）。
+- スペースキーを押して離すと録画が始まり、口が止まって 1 秒（または 10 秒）で自動で終わる。Enter＝保存、Backspace＝撮り直し
+- 収集の計画は `docs/spec.md` の 9章（3 日分）。負例（あくび、咳など）は画面の「フレーズではない動き」で録る
+- 患者さん本人のデータは、本人の PC（プロフィールを分ける）で、特徴点だけを保存する。動画をそのまま PC の外に出さない
 
-## ローカル開発（エミュレータ。GCP 不要）
+## データの置き場所
+`~/LipVoice/<プロフィール>/`（`LIPVOICE_HOME` と `--profile` で変更）。中身は `config.json`、`lipvoice.db`、`clips/`、`models/`。
+1 クリップは約 200KB（250 本で約 50MB）。開発者のテストデータと本人のデータは、別のプロフィールにする。
+
+## 開発
 ```
-# 1. エミュレータ（Auth / Firestore / Storage）
-cd infra && npx firebase-tools emulators:start --only auth,firestore,storage --project demo-lipvoice
-
-# 2. API
-cd server && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-export FIRESTORE_EMULATOR_HOST=127.0.0.1:8081 STORAGE_EMULATOR_HOST=http://127.0.0.1:9199 \
-       FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 GCP_PROJECT_ID=demo-lipvoice \
-       GCS_BUCKET=demo-lipvoice.appspot.com ALLOWED_ORIGINS=http://localhost:5173 ALLOWED_EMAILS=you@example.com
-.venv/bin/uvicorn main:app --port 8000
-
-# 3. 画面（.env.emulator に VITE_* を書く。git 管理外）
-cd web && npm ci && npm run dev:emulator
+cd app && .venv/bin/python -m pytest        # テスト
+cd web && npm run dev                       # 画面の開発（別端末で LIPVOICE_TOKEN=dev lipvoice run --dev、VITE_LIPVOICE_TOKEN=dev）
 ```
-テスト: `server/` で `pytest`、`web/` で `npm test`、`infra/rules-test/` で `npm test`（エミュレータ起動中）。
 
 ## 安全上の前提
-- 緊急の呼び出しはこの仕組みに頼らない
-- 既存の意思伝達装置は置き換えず併用する
-- 自動再生は取り違えが少ないと確認できるまで OFF
+- 緊急の呼び出しはこの仕組みに頼らない。既存の手段を併用する
+- 自動発話は、取り違えが少ないと確認できるまで OFF
+- 顔由来のデータは、OS のディスク暗号化で守る（Mac は FileVault、Windows はデバイスの暗号化）
 
 ## ライセンス
 MIT

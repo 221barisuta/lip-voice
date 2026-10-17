@@ -1,5 +1,0 @@
-{
-  "projects": {
-    "default": "<scripts/deploy.sh が --project で上書きする。実値はここに書かない>"
-  }
-}

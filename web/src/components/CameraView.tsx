@@ -1,45 +1,41 @@
-import { useEffect, useRef, type RefObject } from "react";
-import type { CameraStatus } from "../lib/useMouthCamera";
+import { api } from "../lib/api";
+import type { LiveInfo } from "../types/live";
 
 interface Props {
-  videoRef: RefObject<HTMLVideoElement>;
-  cropCanvas: HTMLCanvasElement;
-  status: CameraStatus;
-  error: string;
-  faceFound: boolean;
+  live: LiveInfo;
+  mouth?: string;
+  frame?: string;
   recording: boolean;
+  fullPreview: boolean;
+  onFullPreview: (on: boolean) => void;
 }
 
-/** カメラ映像（この端末の画面にだけ表示）と、送信される口元の切り出しのプレビュー。 */
-export function CameraView({ videoRef, cropCanvas, status, error, faceFound, recording }: Props) {
-  const mirror = useRef<HTMLCanvasElement>(null);
-
-  // 切り出しの様子を小さく見せる（送信されるのはこの 96×96 だけ）
-  useEffect(() => {
-    const ctx = mirror.current?.getContext("2d");
-    let raf = 0;
-    const tick = () => {
-      raf = requestAnimationFrame(tick);
-      ctx?.drawImage(cropCanvas, 0, 0);
-    };
-    tick();
-    return () => cancelAnimationFrame(raf);
-  }, [cropCanvas]);
-
+/** 送信（保存）される口元の切り出しと、カメラの状態。カメラ位置の確認用の映像は、この画面にだけ出る。 */
+export function CameraView({ live, mouth, frame, recording, fullPreview, onFullPreview }: Props) {
+  const status =
+    live.camera === "error" ? `カメラを使えません: ${live.message}`
+    : live.camera === "starting" ? "カメラ準備中…"
+    : live.face_found ? "顔を検出中" : "顔が見つかりません";
+  const color = live.camera === "ok" && live.face_found ? "green" : "crimson";
+  const toggle = (on: boolean) => { onFullPreview(on); void api.preview(on); };
   return (
-    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+    <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
       <div style={{ position: "relative" }}>
-        <video ref={videoRef} muted playsInline style={{ width: 360, borderRadius: 8, transform: "scaleX(-1)", background: "#000" }} />
-        {recording && <span style={{ position: "absolute", top: 8, left: 8, color: "#fff", background: "#d00", padding: "2px 8px", borderRadius: 4 }}>● 録画中</span>}
+        {mouth
+          ? <img alt="送信される口元" src={`data:image/jpeg;base64,${mouth}`} width={192} height={192}
+                 style={{ border: "1px solid #888", imageRendering: "pixelated" }} />
+          : <div style={{ width: 192, height: 192, background: "#eee" }} />}
+        {recording && <span style={{ position: "absolute", top: 6, left: 6, color: "#fff", background: "#d00", padding: "2px 8px", borderRadius: 4 }}>● 録画中</span>}
       </div>
       <div>
-        <canvas ref={mirror} width={96} height={96} style={{ width: 96, height: 96, border: "1px solid #888" }} />
-        <p style={{ margin: "4px 0", fontSize: 12 }}>送信される口元</p>
-        <p style={{ margin: 0, color: faceFound ? "green" : "crimson" }}>
-          {status === "starting" && "カメラ準備中…"}
-          {status === "error" && `カメラを使えません: ${error}`}
-          {status === "ready" && (faceFound ? "顔を検出中" : "顔が見つかりません")}
+        <p style={{ margin: "0 0 4px", color }}>{status}</p>
+        <p style={{ margin: 0, fontSize: 12, color: "#555" }}>
+          {live.source} ／ {live.fps} fps ／ 処理 {live.proc_ms} ms
         </p>
+        <label style={{ display: "block", marginTop: 8 }}>
+          <input type="checkbox" checked={fullPreview} onChange={(e) => toggle(e.target.checked)} /> カメラ位置の確認（この画面にだけ表示）
+        </label>
+        {fullPreview && frame && <img alt="カメラ" src={`data:image/jpeg;base64,${frame}`} width={320} style={{ marginTop: 8, borderRadius: 6 }} />}
       </div>
     </div>
   );
