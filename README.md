@@ -15,6 +15,7 @@
 
 ## セットアップ（開発: Mac / Linux）
 Python 3.10 以上、Node 22 以上が必要。
+Mac で `node -v` が 22 未満のときは、そのターミナルで `export PATH="/opt/homebrew/opt/node@22/bin:$PATH"; hash -r` を実行してから `setup-dev.sh` を実行する（`~/.zshrc` に node@20 が書いてあると、新しいターミナルでは元に戻る）。
 ```
 scripts/setup-dev.sh          # Python の環境、画面のビルド、顔検出モデルの取得
 app/.venv/bin/lipvoice run --open
