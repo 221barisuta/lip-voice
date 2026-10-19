@@ -64,3 +64,10 @@ def test_calibration_flow_through_phases():
     assert not snap["running"] and snap["result"]["grade"] == "ok" and snap["face_ratio"] == 1.0
     c.start("still", 3.0, 1.5)                                   # 静止からやり直すと、前の結果は消える
     assert "result" not in c.snapshot()
+
+
+def test_noisy_but_clear_movement_is_ok_without_noise_warning():
+    sug = suggest([0.016] * 60, [0.14] * 60, 1.0)          # 実機で見た値（ノイズ 0.016、動き 0.14）
+    assert sug["grade"] == "ok" and not sug["warnings"] and sug["threshold"] > 0.02
+    bad = suggest([0.03] * 60, [0.05] * 60, 1.0)
+    assert bad["grade"] == "ng" and any("静止" in w for w in bad["warnings"])

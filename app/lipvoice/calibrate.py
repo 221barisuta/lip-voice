@@ -33,9 +33,10 @@ def suggest(still: list[float], speech: list[float] | None, still_sec: float) ->
     lo, hi = LIMITS["threshold"]
     threshold = min(hi, max(lo, noise * NOISE_FACTOR))
     out.update({"noise_p95": round(noise, 4), "threshold": round(threshold, 4), "grade": "partial"})
-    if threshold >= 0.02:
-        warn.append("静止していても口の動きが大きく出ています。カメラを近づける・明るくする・位置を変えると改善することがあります")
+    noisy = "静止していても口の動きが大きく出ています。カメラを近づける・明るくする・位置を変えると改善することがあります"
     if speech is None:
+        if threshold >= 0.02:
+            warn.append(noisy)
         return out
     if len(speech) < MIN_SAMPLES:
         warn.append("口パクの測定が短すぎます。もう一度測ってください")
@@ -52,6 +53,8 @@ def suggest(still: list[float], speech: list[float] | None, still_sec: float) ->
     else:
         out["grade"] = "ng"
         warn.append("動きとノイズの差が小さすぎます（SNR 2 未満）。口を大きめに動かして測り直すか、カメラ位置・明るさを見直してください")
+    if out["grade"] != "ok" and threshold >= 0.02 and noisy not in warn:       # 動きが十分大きければ（合格）、ノイズの大きさは問題にしない
+        warn.append(noisy)
     return out
 
 
