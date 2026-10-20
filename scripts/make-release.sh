@@ -30,7 +30,10 @@ echo "== 画面をビルド"
 "$ROOT/scripts/build-ui.sh"
 
 echo "== lipvoice の wheel（純 Python）"
+rm -rf "$ROOT/app/build" "$ROOT"/app/*.egg-info    # 古いビルドの残りが入らないようにする
 "$PIP" wheel -q --no-deps -w "$STAGE/wheels" "$ROOT/app"
+WHL_KB=$(du -k "$STAGE"/wheels/lipvoice-*.whl | cut -f1)
+[ "$WHL_KB" -lt 3072 ] || { echo "lipvoice の wheel が大きすぎます（${WHL_KB}KB）。余分なファイルが入っています: unzip -l $STAGE/wheels/lipvoice-*.whl | sort -k1 -n -r | head"; exit 1; }
 
 echo "== Windows 用の依存の wheel（${PY_TAG}, win_amd64）"
 # colorama は click の Windows 専用の依存（この Mac では自動で選ばれないので明示する）
