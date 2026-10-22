@@ -47,7 +47,9 @@ scripts/make-release.sh            # Mac で。release/lipvoice-win-<版>.zip（
 zip を USB で PC に持っていき、展開して `install.cmd` を実行する（管理者権限は不要。VC++ ランタイムが無い PC だけ許可を求める）。
 専用の Python・依存・顔検出モデルを `C:\LipVoice` に入れ、デスクトップに `LipVoice` と `LipVoice check (bench)` ができる。導入時にネットは要らない。
 消すときは `C:\LipVoice` とショートカットを削除するだけ。確認の手順は [docs/day0-checklist.md](docs/day0-checklist.md)。
-Windows 実機での動作は未確認（GitHub Actions の windows-latest でテストと、wheel だけでのオフライン導入を確認する）。
+導入済みの PC のコードだけを更新するときは `scripts/make-update.sh`（約 150KB の zip、`update.cmd` を実行）。
+Windows 実機での導入と bench は動いた（カメラ・顔検出の確認は進行中）。
+カメラ・顔検出・視線入力ソフトとの同居は、実機での確認が必要（CI の windows-latest で、テストと、wheel だけでのオフライン導入は確認している）。
 
 ## 実際の収集（患者さん本人の PC。特徴点だけを保存）
 - スペースキーを押して離すと録画が始まり、口が止まって 1 秒（または 10 秒）で自動で終わる。Enter＝保存、Backspace＝撮り直し、Esc＝中止。大きなボタンも使える

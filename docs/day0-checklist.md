@@ -43,6 +43,8 @@
 | 口パクとノイズの差（SNR） | 3 以上 | 2〜3 | 2 未満 |
 | 閾値の候補 | 0.02 未満 | — | 0.02 以上（静止してもノイズが大きい） |
 
+- **顔の検出率が低い・「画像内の回転」が大きい**時は、bench が自動で、映像の向き（0/90/180/270°）ごとに顔が検出できるかを調べ、`config.json` の `"camera_rotate"` に入れる値を案内する。その値に書き換えて、もう一度 bench を実行する
+- どの向きでも検出できない時は、収集画面の「カメラ位置の確認」で映像を見る（顔が映っているか、小さすぎないか、暗くないか）。IR カメラを掴んでいる場合は `cameras.cmd` で別の番号を探す
 - 「不合格」が 1 つでもあれば、収集に進まない。カメラの位置・角度・明るさ・遮蔽（管、テープ、マスク）を見直して、bench をやり直す
 - 結果の写真（またはテキスト）を開発者に送る。判断と、閾値の反映のしかたを案内する
 
@@ -75,3 +77,7 @@
 - Mac: `lipvoice --home ~/LipVoice-patient import <USB 内の lipvoice-export-patient-...>` → `lipvoice --home ~/LipVoice-patient --profile patient check` → 学習 `train`
 - 学習したモデルを戻す: Mac で `export <USB> --models-only --force` → PC で `import-models <USB 内のフォルダ> --activate` → LipVoice を再起動
 - USB は暗号化（BitLocker To Go）し、Mac での保管期間と削除の方法を、同意の説明に含める。使い終わった書き出しは USB から削除する
+
+## 付録: コードだけの更新（導入済みの PC）
+- Mac で `scripts/make-update.sh` を実行すると、小さな更新 zip（約 150KB）ができる
+- PC で展開して `update.cmd` をダブルクリック（`C:\LipVoice` の `lipvoice` だけを入れ替える。データ・設定・依存はそのまま）

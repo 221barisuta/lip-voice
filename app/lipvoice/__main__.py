@@ -5,6 +5,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from . import __version__
 from .paths import Paths, home_dir
 
 MODEL_URL = ("https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/"
@@ -243,6 +244,7 @@ def _safe_streams() -> None:
 def main() -> None:
     _safe_streams()
     ap = argparse.ArgumentParser(prog="lipvoice")
+    ap.add_argument("--version", action="version", version=f"lipvoice {__version__}")
     ap.add_argument("--home", help="データの置き場所（既定: ~/LipVoice）")
     ap.add_argument("--profile", default="default", help="利用者ごとのフォルダ名")
     sub = ap.add_subparsers(dest="cmd", required=True)

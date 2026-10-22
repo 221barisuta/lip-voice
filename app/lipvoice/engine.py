@@ -16,9 +16,9 @@ from .recording.controller import RecordingController
 from .vision.crop import MouthCropper
 from .vision.geometry import Landmarks, mouth_geometry, mouth_opening, mouth_width_ratio
 from .vision.landmarker import FaceDetector
+from .vision.rotate import rotate_image
 from .vision.stillness import StillnessConfig, StillnessDetector
 
-_ROTATE = {90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
 
 
 @dataclass
@@ -163,7 +163,7 @@ class Engine:
                 continue                             # 待機中は検出を間引いて、PC の負荷を下げる
             last_done = frame.t
             t_start = time.perf_counter()
-            image = cv2.rotate(frame.image, _ROTATE[s.camera_rotate]) if s.camera_rotate in _ROTATE else frame.image
+            image = rotate_image(frame.image, s.camera_rotate)
             h, w = image.shape[:2]
             det = detector.detect(image, frame.t * 1000)
             geom = opening = None
