@@ -63,7 +63,7 @@ Step "6/7 Model and settings (顔検出モデルと設定)"
 Copy-Item (Join-Path $Here "vendor\face_landmarker.task") "$Root\data\assets\face_landmarker.task" -Force
 $cfg = "$Root\data\$Profile\config.json"
 if (-not (Test-Path $cfg)) { Copy-Item (Join-Path $Here "profiles\patient.config.json") $cfg } else { Write-Host "config.json already exists (kept)" }
-foreach ($f in "run.cmd", "bench.cmd", "cameras.cmd") { Copy-Item (Join-Path $Here $f) "$Root\$f" -Force }
+foreach ($f in "run.cmd", "bench.cmd", "cameras.cmd", "train.cmd") { Copy-Item (Join-Path $Here $f) "$Root\$f" -Force }
 New-Item -ItemType Directory -Force -Path "$Root\docs" | Out-Null
 Copy-Item (Join-Path $Here "docs\*") "$Root\docs" -Force -ErrorAction SilentlyContinue
 
