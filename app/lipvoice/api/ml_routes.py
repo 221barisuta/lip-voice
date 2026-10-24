@@ -20,7 +20,7 @@ class ActivateBody(BaseModel):
     version: str
 
 
-def register(app: FastAPI, engine, store: Store, speak: SpeakSession, models_root: Path) -> None:
+def register(app: FastAPI, engine, store: Store, speak: SpeakSession, models_root: Path, trainer=None) -> None:
     @app.get("/api/speak/state")
     def speak_state():
         return speak.snapshot()
@@ -41,14 +41,30 @@ def register(app: FastAPI, engine, store: Store, speak: SpeakSession, models_roo
 
     @app.get("/api/report")
     def report():
-        """学習・評価の結果（lipvoice train が書く）と、実使用の日ごとの正解率。"""
+        """使っているモデルの学習・評価の結果と、実使用の日ごとの正解率、自動学習の状態（使わなかった新しい版は pending）。"""
+        act = active_version(models_root)
         latest = None
-        try:
-            latest = json.loads((models_root / "reports" / "latest.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            pass
-        return {"report": latest, "real_use": store.real_use_by_day(),
-                "models": {"versions": versions(models_root), "active": active_version(models_root)}}
+        for name in ([f"{act}.json"] if act else []) + ["latest.json"]:
+            try:
+                latest = json.loads((models_root / "reports" / name).read_text(encoding="utf-8"))
+                break
+            except (OSError, ValueError):
+                continue
+        auto = trainer.state() if trainer is not None else None
+        pending = None
+        if auto and auto.get("version") and auto.get("version") != act and auto.get("activated") is False:
+            pending = {"version": auto["version"], "reason": auto.get("reason")}
+        return {"report": latest, "real_use": store.real_use_by_day(), "auto": auto, "pending": pending,
+                "models": {"versions": versions(models_root), "active": act}}
+
+    @app.post("/api/auto_train/run")
+    def auto_train_run():
+        """家族が「今すぐ学習し直す」を押した時。新しいデータがなくても、手動なら実行する。"""
+        if trainer is None:
+            raise StateError("自動学習が使えません")
+        if not trainer.run_now("manual"):
+            raise StateError("学習がすでに実行中です")
+        return trainer.state()
 
     @app.post("/api/models/activate")
     def activate(body: ActivateBody):

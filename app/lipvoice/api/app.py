@@ -32,7 +32,7 @@ class PreviewBody(BaseModel):
 
 def create_app(engine: Engine, store: Store, collect: CollectSession, holder: SettingsHolder, *,
                port: int, token: str, static_dir: Path | None = None, dev_origins: list[str] | None = None,
-               extra_hosts: list[str] | None = None, speak=None, models_root: Path | None = None) -> FastAPI:
+               extra_hosts: list[str] | None = None, speak=None, models_root: Path | None = None, trainer=None) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(StateError)
@@ -65,7 +65,8 @@ def create_app(engine: Engine, store: Store, collect: CollectSession, holder: Se
     # 画面から変えてよい設定。カメラ（camera_*）・時刻・制限値は、設定ファイルからだけ変えられる
     EDITABLE = {"threshold", "still_sec", "max_sec", "session_minutes", "min_detected_ratio", "negative_kinds",
                 "date_override", "auto_save", "idle_fps", "face_detection_confidence", "face_presence_confidence",
-                "tracking_confidence", "active_threshold"}
+                "tracking_confidence", "active_threshold", "auto_train", "train_sources",
+                "auto_activate_min_top3"}
 
     @app.put("/api/settings")
     def put_settings(changes: dict):
@@ -148,7 +149,7 @@ def create_app(engine: Engine, store: Store, collect: CollectSession, holder: Se
 
     if speak is not None and models_root is not None:
         from . import ml_routes
-        ml_routes.register(app, engine, store, speak, models_root)
+        ml_routes.register(app, engine, store, speak, models_root, trainer)
 
     # ---- 画面への配信（Server-Sent Events）----
     @app.get("/api/events")

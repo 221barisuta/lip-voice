@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BigButton } from "../components/BigButton";
+import { AutoTrainPanel } from "../components/AutoTrainPanel";
 import { ConfusionTable } from "../components/ConfusionTable";
 import { NavBar } from "../components/NavBar";
 import { api } from "../lib/api";
@@ -32,17 +33,19 @@ export function Report() {
   const [data, setData] = useState<ReportPayload | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
-  const load = () => { api.report().then(setData).catch((e) => setError(String(e.message))); };
+  const load = useCallback(() => { api.report().then(setData).catch((e) => setError(String(e.message))); }, []);
   useEffect(() => { load(); api.phrases().then((r) => setNames(Object.fromEntries(r.phrases.map((p) => [p.id, p.text])))).catch(() => undefined); }, []);
   if (!data) return <main style={{ padding: 24 }}><NavBar />{error || "読み込み中…"}</main>;
   const rep = data.report;
   if (!rep) {
-    return <main style={{ padding: 24 }}><NavBar /><h2>評価</h2><p>まだ学習していません。データを集めたら、ターミナルで <code>lipvoice train</code> を実行してください。</p></main>;
+    return <main style={{ padding: 24 }}><NavBar /><h2>評価</h2><p>まだ学習していません。データを集めたら、下の「今すぐ学習し直す」を押してください（自動学習の設定が「毎晩」なら、翌日に自動で学習します）。</p>
+      <AutoTrainPanel auto={data.auto} pending={data.pending} active={data.models.active} onChanged={load} /></main>;
   }
   const res: ModelResult | undefined = rep.results[rep.active];
   return (
     <main style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
       <NavBar right={`モデル ${rep.version}（${rep.active}）`} />
+      <AutoTrainPanel auto={data.auto} pending={data.pending} active={data.models.active} onChanged={load} />
       <h2>評価</h2>
       <p style={{ fontSize: 14, color: "#555" }}>
         学習日時 {rep.created_at} ／ フレーズ {rep.n_pos} 本・負例 {rep.n_neg} 本 ／ 撮影日 {rep.dates.join("、")}（{Object.entries(rep.counts_by_day).map(([d, n]) => `${d}: ${n}`).join("、")}）

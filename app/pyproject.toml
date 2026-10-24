@@ -1,6 +1,6 @@
 [project]
 name = "lipvoice"
-version = "0.2.2"
+version = "0.2.3"
 description = "口パク（声なし）を読み取り、定型フレーズを音声にするローカルアプリ"
 requires-python = ">=3.12"
 dependencies = [

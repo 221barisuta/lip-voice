@@ -9,7 +9,7 @@ import sqlite3
 import threading
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -61,7 +61,10 @@ class Store:
     def today(self) -> str:
         """撮影日。試験用に date_override が設定されていれば、それを使う（実際の収集では空）。"""
         s = self._settings()
-        return s.date_override or datetime.now(ZoneInfo(s.timezone)).strftime("%Y-%m-%d")
+        if s.date_override:
+            return s.date_override
+        now = datetime.now(ZoneInfo(s.timezone))
+        return (now - timedelta(hours=s.day_start_hour)).strftime("%Y-%m-%d")     # 夜更かしの収集は、前日にまとめる
 
     # ---- フレーズ ----
     def phrases(self) -> list[dict]:

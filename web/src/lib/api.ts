@@ -49,6 +49,7 @@ export const api = {
     post<{ choice: { text: string | null } }>("/api/speak/choose", { phrase_id, negative }),
   speakSkip: () => post("/api/speak/skip"),
   report: () => json<ReportPayload>("/api/report"),
+  autoTrainRun: () => post("/api/auto_train/run"),
   activateModel: (version: string) => post("/api/models/activate", { version }),
   phraseInfo: () => json<{ phrases: PhraseInfo[] }>("/api/phrases/info"),
   addPhrase: (text: string) => post("/api/phrases", { text }),

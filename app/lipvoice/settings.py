@@ -17,7 +17,11 @@ LIMITS: dict[str, tuple[float, float]] = {
     "face_detection_confidence": (0.1, 0.9),
     "face_presence_confidence": (0.1, 0.9),
     "tracking_confidence": (0.1, 0.9),
+    "day_start_hour": (0.0, 6.0),           # この時刻までは前日の撮影日として扱う（夜更かしの収集を前日にまとめる）
+    "auto_activate_min_top3": (0.0, 1.0),   # 自動学習の新しいモデルを、自動で使い始める最低の上位 3 正解率
 }
+AUTO_TRAIN_MODES = ("off", "nightly", "after_session", "on_start")
+TRAIN_SOURCES = {"collect": ("collect",), "collect_use_top1": ("collect", "use_top1"), "collect_use_all": ("collect", "use")}
 
 DEFAULT_NEGATIVE_KINDS = ["あくび", "咳", "口を湿らせる", "飲み込み", "自由な口パク", "その他"]
 
@@ -50,6 +54,11 @@ class Settings:
     # 試験用: 1 日でまとめて集めても「1 日目」「2 日目」として記録できる。実際の収集では空にする
     date_override: str = ""
     auto_save: bool = False              # 試験用: 保存できる録画は確認なしで保存して次へ進む
+    # 運用: 自動学習（DTW のみ。別プロセス・低い優先度）。新しいモデルは、評価が基準を満たす時だけ自動で使い始める
+    auto_train: str = "nightly"          # off | nightly（日付の切り替えの 1 時間後）| after_session | on_start
+    train_sources: str = "collect"       # collect | collect_use_top1（実使用のうち 1 位が合っていたもの）| collect_use_all
+    auto_activate_min_top3: float = 0.7
+    day_start_hour: float = 0.0
     # 制限（0 は無制限）。既定は緩く、必要になったら絞る
     max_phrases: int = 1000
     max_phrase_chars: int = 200
@@ -82,6 +91,10 @@ def sanitize(raw: dict) -> Settings:
             out[f.name] = items[:200] or default
     for k in ("max_phrases", "max_phrase_chars", "max_clips_per_day", "camera_width", "camera_height", "camera_fps", "idle_fps"):
         out[k] = max(0, int(out[k]))
+    if out["auto_train"] not in AUTO_TRAIN_MODES:
+        out["auto_train"] = base.auto_train
+    if out["train_sources"] not in TRAIN_SOURCES:
+        out["train_sources"] = base.train_sources
     if out["camera_backend"] not in ("any", "msmf", "dshow"):
         out["camera_backend"] = "any"
     if out["camera_rotate"] not in (0, 90, 180, 270):

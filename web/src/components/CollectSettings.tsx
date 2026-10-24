@@ -44,6 +44,31 @@ export function CollectSettings({ liveRange, disabled }: Props) {
         口を閉じて（楽にして）静止した時の値より少し大きい値にします。
       </p>
       <fieldset style={{ marginTop: 8 }}>
+        <legend>自動学習（患者さんの PC では DTW のみ。別プロセス・低い優先度で動く）</legend>
+        <label style={{ display: "block" }}>
+          学習する時機:{" "}
+          <select value={s.auto_train} onChange={(e) => put({ auto_train: e.target.value })}>
+            <option value="nightly">毎晩（日付の切り替えの 1 時間後。新しいデータがある時だけ）</option>
+            <option value="after_session">収集セッションの終了後</option>
+            <option value="on_start">起動の 5 分後</option>
+            <option value="off">しない（手動）</option>
+          </select>
+        </label>
+        <label style={{ display: "block", marginTop: 4 }}>
+          学習に使うデータ:{" "}
+          <select value={s.train_sources} onChange={(e) => put({ train_sources: e.target.value })}>
+            <option value="collect">収集したものだけ（おすすめ）</option>
+            <option value="collect_use_top1">＋実使用のうち、1 位が合っていたもの</option>
+            <option value="collect_use_all">＋実使用のすべて（選び間違いが混ざる）</option>
+          </select>
+        </label>
+        <label style={{ display: "block", marginTop: 4 }}>
+          新しいモデルを自動で使い始める最低の上位 3 正解率:{" "}
+          <input type="number" min={0} max={100} step={5} value={Math.round(s.auto_activate_min_top3 * 100)}
+                 onChange={(e) => put({ auto_activate_min_top3: Number(e.target.value) / 100 })} style={{ width: 60 }} /> %
+        </label>
+      </fieldset>
+      <fieldset style={{ marginTop: 8 }}>
         <legend>試験用（実際の収集では、どちらも空・オフにする）</legend>
         <label style={{ display: "block" }}>
           撮影日の上書き:{" "}

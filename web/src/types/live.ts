@@ -102,6 +102,9 @@ export interface SettingsPayload {
     camera_source: string;
     date_override: string;
     auto_save: boolean;
+    auto_train: "off" | "nightly" | "after_session" | "on_start";
+    train_sources: "collect" | "collect_use_top1" | "collect_use_all";
+    auto_activate_min_top3: number;
   };
   limits: Record<string, [number, number]>;
 }

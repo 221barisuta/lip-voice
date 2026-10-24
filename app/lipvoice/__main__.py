@@ -87,10 +87,16 @@ def cmd_synth(args) -> int:
 def cmd_train(args) -> int:
     from .ml.features import FeatureConfig
     from .ml.train import run_training
+    from .ml.auto_train import train_lock
     p, holder, store = _store(args)
     cfg = FeatureConfig(use_duration=args.use_duration, active_threshold=holder.get().active_threshold)
-    rep = run_training(store, p, cfg, epochs=args.epochs, seed=args.seed, use_cnn=not args.no_cnn,
-                       sources=tuple(args.sources.split(",")), activate=not args.no_activate, force_active=args.active)
+    try:
+        with train_lock(p.models):                       # 自動学習や、もう 1 つの train と同時に走らせない
+            rep = run_training(store, p, cfg, epochs=args.epochs, seed=args.seed, use_cnn=not args.no_cnn,
+                               sources=tuple(args.sources.split(",")), activate=not args.no_activate, force_active=args.active)
+    except RuntimeError as e:
+        print(f"中止しました: {e}", file=sys.stderr)
+        return 1
     print(f"学習済みモデル: {rep['version']}（使うモデル: {rep['active']}）  {rep['seconds']} 秒")
     for k, r in rep.get("results", {}).items():
         m = r["lodo"]
@@ -203,6 +209,9 @@ def cmd_run(args) -> int:
         print(f"整合性: 孤児 {rep.moved} 件を退避、欠損 {len(rep.missing_files)} 件", file=sys.stderr)
     from .speak import SpeakSession
     collect = CollectSession(store, holder.get)
+    from .ml.auto_train import AutoTrainer
+    from .ml.model_store import cleanup_tmp
+    cleanup_tmp(p.models)                              # 学習の途中で止まった一時フォルダを消す
     speak = SpeakSession(store, holder.get, p.models)
     engine = Engine(p.model_file, holder.get, collect, speak=speak)
     # 固定のトークンは開発用（--dev）の時だけ。通常は起動のたびに作る
@@ -210,9 +219,11 @@ def cmd_run(args) -> int:
     _lower_priority()
     static = Path(__file__).parent / "static"
     dev_origins = ["http://localhost:5173", "http://127.0.0.1:5173"] if args.dev else None
+    trainer = AutoTrainer(p, store, holder.get, speak, collect)
     app = create_app(engine, store, collect, holder, port=args.port, token=token, static_dir=static,
-                     dev_origins=dev_origins, speak=speak, models_root=p.models)
+                     dev_origins=dev_origins, speak=speak, models_root=p.models, trainer=trainer)
     engine.start()
+    trainer.start()
     url = f"http://127.0.0.1:{args.port}/"
     print(f"起動しました: {url}   （データ: {p.root}）")
     if args.open:

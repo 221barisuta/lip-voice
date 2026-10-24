@@ -44,8 +44,21 @@ export interface Report {
   judgement?: { lodo: Record<string, Judge>; last_day: Record<string, Judge> | null };
 }
 
+export interface AutoTrainState {
+  running: boolean;
+  last_run_at?: string;
+  finished_at?: string;
+  last_reason?: string;
+  version?: string | null;
+  activated?: boolean | null;
+  reason?: string | null;
+  error?: string | null;
+}
+
 export interface ReportPayload {
   report: Report | null;
   real_use: { date: string; n: number; top1: number; top3: number; rejected: number }[];
+  auto: AutoTrainState | null;
+  pending: { version: string; reason: string | null } | null;
   models: { versions: string[]; active: string | null };
 }

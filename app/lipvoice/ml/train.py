@@ -126,5 +126,6 @@ def run_training(store, paths: Paths, cfg: FeatureConfig, *, epochs: int = 60, s
     rdir = paths.models / "reports"
     rdir.mkdir(parents=True, exist_ok=True)
     _atomic_json(rdir / f"{version}.json", report)
-    _atomic_json(rdir / "latest.json", report)
+    if activate:                                       # 使わなかった版の成績を、「最新」として出さない
+        _atomic_json(rdir / "latest.json", report)
     return report
