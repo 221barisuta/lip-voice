@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS predictions(
   chosen TEXT, outcome TEXT NOT NULL,   -- outcome: phrase（選ばれた）| negative（フレーズではない動き）| skipped
   correct_top1 INTEGER, correct_top3 INTEGER, latency_ms REAL);
 CREATE INDEX IF NOT EXISTS idx_pred_date ON predictions(date);
+CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);   -- 単調増加の採番など（削除しても戻さない）
 """
 
 

@@ -6,6 +6,12 @@ if not exist "%LV_ROOT%venv\Scripts\python.exe" (
   pause
   exit /b 1
 )
+tasklist /FI "IMAGENAME eq lipvoice.exe" 2>nul | find /I "lipvoice.exe" >nul
+if not errorlevel 1 (
+  echo LipVoice is running. Please close LipVoice first, then run this again.
+  pause
+  exit /b 1
+)
 set FOUND=0
 for %%f in ("%~dp0lipvoice-*.whl") do (
   set FOUND=1
@@ -16,5 +22,5 @@ for %%c in (run.cmd bench.cmd cameras.cmd train.cmd) do if exist "%~dp0%%c" copy
 if "%FOUND%"=="0" echo No lipvoice-*.whl next to update.cmd
 "%LV_ROOT%venv\Scripts\lipvoice.exe" --version 2>nul
 echo.
-echo Done. Please start LipVoice again.
+echo Done. Please start LipVoice again, and reload (or reopen) the browser tab.
 pause

@@ -13,6 +13,7 @@ export function NavBar({ right }: { right?: string }) {
         <NavLink to="/speak" style={link}>認識（テスト）</NavLink>
         <NavLink to="/report" style={link}>評価</NavLink>
         <NavLink to="/data" style={link}>データ</NavLink>
+        <NavLink to="/phrases" style={link}>フレーズ</NavLink>
       </div>
       <span>{right}</span>
     </nav>

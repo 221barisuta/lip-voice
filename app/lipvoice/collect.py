@@ -57,12 +57,31 @@ class CollectSession:
         self.pending: Pending | None = None
         self._phrases = store.phrases()
         self._queue = PhraseQueue(self._phrases)
+        self._focus: str | None = None          # 指定したフレーズを続けて録る（主要フレーズを重点的に集める）
+        self._phrases_dirty = False             # 録画中・確認中に編集された（次に待機へ戻った時に読み込み直す）
         self._started_at: float | None = None
         self.session_id = uuid.uuid4().hex
-        self._phrase = self._queue.next()
+        self._phrase = self._next_phrase()
         self._stats = store.stats()
         self.last_saved: dict | None = None      # 直近に保存したもの（自動保存の表示用）
         self._saved_ids: list[tuple[str, dict | None]] = []    # このセッションで保存したもの（取り消し用）
+
+    def _next_phrase(self) -> dict:
+        if self._focus:
+            for p in self._phrases:
+                if p["id"] == self._focus:
+                    return p
+            self._focus = None                  # 指定したフレーズがなくなった
+        return self._queue.next()
+
+    def set_focus(self, phrase_id: str | None) -> None:
+        with self._lock:
+            if self.phase != "idle":
+                raise StateError("いまは変更できません")
+            if phrase_id is not None and not any(p["id"] == phrase_id for p in self._phrases):
+                raise StateError("そのフレーズがありません")
+            self._focus = phrase_id
+            self._phrase = self._next_phrase()
 
     # ---- 操作 ----
     def new_session(self) -> None:
@@ -109,6 +128,7 @@ class CollectSession:
             if self.phase != "review":
                 raise StateError("撮り直せる録画がありません")
             self.pending, self.phase = None, "idle"
+            self._apply_phrase_changes()
 
     def save(self) -> str:
         with self._lock:
@@ -136,7 +156,8 @@ class CollectSession:
         self._saved_ids.append((clip_id, t.get("phrase") if rec.kind == "phrase" else None))
         del self._saved_ids[:-20]
         if rec.kind == "phrase":
-            self._phrase = self._queue.next()
+            self._phrase = self._next_phrase()
+        self._apply_phrase_changes()
         return clip_id
 
     def skip(self) -> None:
@@ -144,8 +165,8 @@ class CollectSession:
         with self._lock:
             if self.phase != "idle":
                 raise StateError("いまはスキップできません")
-            if self.mode == "phrase":
-                self._phrase = self._queue.next()
+            if self.mode == "phrase" and not self._focus:      # 指定したフレーズを続けて録っている時は、そのまま
+                self._phrase = self._next_phrase()
 
     def undo_last(self) -> dict:
         """直前に保存したクリップを取り消す（違うフレーズを口パクしていた時など）。このセッションで保存したものだけ。"""
@@ -178,12 +199,17 @@ class CollectSession:
     def _reload_phrases(self) -> None:
         self._phrases = self._store.phrases()
         self._queue = PhraseQueue(self._phrases)
-        self._phrase = self._queue.next()
+        self._phrase = self._next_phrase()
+        self._phrases_dirty = False
+
+    def _apply_phrase_changes(self) -> None:
+        if self._phrases_dirty and self.phase in ("idle", "ended"):
+            self._reload_phrases()
 
     def phrases_changed(self) -> None:
         with self._lock:
-            if self.phase in ("idle", "ended"):
-                self._reload_phrases()
+            self._phrases_dirty = True
+            self._apply_phrase_changes()
 
     # ---- 表示用 ----
     def snapshot(self) -> dict:
@@ -204,4 +230,4 @@ class CollectSession:
                     "target": self.target, "pending": pend, "session_remaining_sec": left,
                     "session_total_sec": int(s.session_minutes * 60), "stats": self._stats,
                     "last_saved": self.last_saved, "date": self._store.today(), "auto_save": s.auto_save,
-                    "phrases": self._phrases}
+                    "phrases": self._phrases, "focus": self._focus}

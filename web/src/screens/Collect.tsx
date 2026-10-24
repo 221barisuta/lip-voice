@@ -65,6 +65,16 @@ export function Collect() {
       <NavBar right={`${connected ? "" : "（接続が切れています）"} 撮影日 ${c.date} ／ セッション残り ${mm}:${ss}`} />
       <ModeSwitch state={c} disabled={c.phase !== "idle"} onError={setError} />
       <PhraseCard state={c} remainingSec={snap.live.remaining_sec} />
+      {c.phase === "idle" && c.mode === "phrase" && (
+        <p style={{ margin: "4px 0" }}>
+          <label>このフレーズを続けて録る:{" "}
+            <select value={c.focus ?? ""} onChange={(e) => act(() => api.setFocus(e.target.value || null))()}>
+              <option value="">指定しない（順番に）</option>
+              {c.phrases.map((p) => <option key={p.id} value={p.id}>{p.text}</option>)}
+            </select>
+          </label>
+        </p>
+      )}
       <CameraView live={snap.live} mouth={mouth} frame={frame} recording={recording} fullPreview={fullPreview} onFullPreview={setFullPreview} />
 
       {c.phase === "idle" && (

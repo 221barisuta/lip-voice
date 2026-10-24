@@ -142,8 +142,9 @@ def create_app(engine: Engine, store: Store, collect: CollectSession, holder: Se
         engine.set_full_preview(body.full)
         return {"full": body.full}
 
-    from . import data_routes
+    from . import data_routes, phrase_routes
     data_routes.register(app, engine, store, collect, holder)
+    phrase_routes.register(app, store, collect, models_root)
 
     if speak is not None and models_root is not None:
         from . import ml_routes

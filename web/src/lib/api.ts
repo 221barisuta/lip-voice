@@ -1,4 +1,5 @@
 import type { CalibrationState, ClipsPayload } from "../types/data";
+import type { PhraseInfo } from "../types/phrase";
 import type { Snapshot } from "../types/live";
 import type { ReportPayload } from "../types/report";
 
@@ -49,6 +50,10 @@ export const api = {
   speakSkip: () => post("/api/speak/skip"),
   report: () => json<ReportPayload>("/api/report"),
   activateModel: (version: string) => post("/api/models/activate", { version }),
+  phraseInfo: () => json<{ phrases: PhraseInfo[] }>("/api/phrases/info"),
+  addPhrase: (text: string) => post("/api/phrases", { text }),
+  putPhrases: (phrases: { id: string; text: string }[]) => json("/api/phrases", { method: "PUT", body: JSON.stringify({ phrases }) }),
+  setFocus: (phrase_id: string | null) => post("/api/collect/focus", { phrase_id }),
   phrases: () => json<{ phrases: { id: string; text: string }[] }>("/api/phrases"),
   clips: (query: string) => json<ClipsPayload>(`/api/clips?${query}`),
   clipVideo: async (id: string): Promise<Blob> => (await raw(`/api/clips/${id}/video`)).blob(),

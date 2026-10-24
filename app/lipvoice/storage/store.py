@@ -84,6 +84,14 @@ class Store:
                 raise ValueError("id またはテキストが不正です")
             if s.max_phrase_chars and len(text) > s.max_phrase_chars:
                 raise ValueError(f"フレーズは {s.max_phrase_chars} 文字までです")
+        if not _initial:
+            # 録画のあるフレーズは消せない（clips.phrase_id に外部キーがなく、黙って孤児になるため）。この関数を通るすべての経路で守る
+            in_use = {r[0] for r in self.db.execute("SELECT DISTINCT phrase_id FROM clips WHERE phrase_id IS NOT NULL")}
+            lost = in_use - set(ids)
+            if lost:
+                names = [r["text"] for r in self.db.execute(
+                    f"SELECT text FROM phrases WHERE id IN ({','.join('?' * len(lost))})", list(lost))]
+                raise ValueError(f"録画のあるフレーズは削除できません: {'、'.join(names) or ', '.join(sorted(lost))}")
         with self._lock:
             self.db.execute("BEGIN IMMEDIATE")
             try:
@@ -95,6 +103,42 @@ class Store:
                 self.db.execute("ROLLBACK")
                 raise
         return self.phrases()
+
+    def add_phrase(self, text: str) -> dict:
+        """フレーズを 1 件、末尾に追加する。id は p + 連番で自動採番し、削除しても番号を戻さない（古いモデル・評価と食い違わないように）。"""
+        s: Settings = self._settings()
+        text = (text or "").strip()
+        if not text:
+            raise ValueError("フレーズが空です")
+        if s.max_phrase_chars and len(text) > s.max_phrase_chars:
+            raise ValueError(f"フレーズは {s.max_phrase_chars} 文字までです")
+        with self._lock:
+            cur = self.phrases()
+            if s.max_phrases and len(cur) >= s.max_phrases:
+                raise ValueError(f"フレーズは {s.max_phrases} 件までです")
+            if any(p["text"] == text for p in cur):
+                raise ValueError("同じフレーズがすでにあります")
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                used = [int(m.group(1)) for (v,) in self.db.execute(
+                    "SELECT id FROM phrases UNION SELECT phrase_id FROM clips WHERE phrase_id IS NOT NULL "
+                    "UNION SELECT chosen FROM predictions WHERE chosen IS NOT NULL") if v and (m := re.fullmatch(r"p(\d+)", v))]
+                row = self.db.execute("SELECT value FROM meta WHERE key='next_phrase_seq'").fetchone()
+                n = max(int(row[0]) if row else 0, max(used, default=0) + 1)
+                pid = f"p{n:02d}"
+                self.db.execute("INSERT INTO phrases(id, text, position) VALUES (?,?,?)", (pid, text, len(cur)))
+                self.db.execute("INSERT INTO meta(key, value) VALUES ('next_phrase_seq', ?) "
+                                "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(n + 1),))
+                self.db.execute("COMMIT")
+            except BaseException:
+                self.db.execute("ROLLBACK")
+                raise
+        return {"id": pid, "text": text}
+
+    def phrase_stats(self) -> dict[str, dict]:
+        """フレーズごとの録画の本数と、撮影日の数（評価には別の日が 2 日以上要る）。"""
+        return {r["phrase_id"]: {"clips": r["n"], "days": r["d"]} for r in self.db.execute(
+            "SELECT phrase_id, COUNT(*) n, COUNT(DISTINCT date) d FROM clips WHERE kind='phrase' GROUP BY phrase_id")}
 
     def phrase_exists(self, phrase_id: str) -> bool:
         return self.db.execute("SELECT 1 FROM phrases WHERE id=?", (phrase_id,)).fetchone() is not None

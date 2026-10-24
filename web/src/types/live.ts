@@ -49,6 +49,8 @@ export interface CollectState {
   last_saved: { label: string; seconds: number; n: number } | null;
   date: string;
   auto_save: boolean;
+  /** 続けて録るフレーズの id（指定がなければ null） */
+  focus: string | null;
 }
 
 export interface Candidate {
