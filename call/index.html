@@ -105,16 +105,19 @@ button:focus-visible { outline: 6px solid var(--focus); outline-offset: 4px; }
 .alarm .sub { font-size: clamp(1.2rem, 3.4vw, 2.2rem); font-weight: 700; text-wrap: balance; }
 .alarm .when { font-size: clamp(1rem, 2.6vw, 1.6rem); font-variant-numeric: tabular-nums; font-weight: 700; }
 .btn-stop {
+  position: relative; overflow: hidden; -webkit-touch-callout: none; touch-action: none;
   background: #ffffff; color: #1b1b1b; border-radius: 22px;
   padding: 24px 40px; font-family: var(--font-display); font-weight: 900; font-size: clamp(1.5rem, 3.6vw, 2.4rem);
   box-shadow: 0 10px 0 rgba(0,0,0,.25);
 }
+.btn-stop .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: #ffcf33; }
+.btn-stop .lbl { position: relative; }
 .note { color: var(--muted); font-size: .85rem; text-align: center; margin: 0; }
 </style>
 </head>
 <body>
 
-<div class="app">
+<div class="app" id="app">
   <section class="start" id="start">
     <h1>体交コール</h1>
     <p>スイッチ1回で、呼び出しの音が鳴ります。<br>音は「とめる」を押すまで鳴りつづけます。</p>
@@ -123,6 +126,7 @@ button:focus-visible { outline: 6px solid var(--focus); outline-offset: 4px; }
       <li>設定 → 画面表示 → 自動ロック「なし」</li>
       <li>アクセスガイドでこの画面に固定</li>
       <li>体交の前に、スイッチが左手から外れない位置か確認</li>
+      <li>音をとめるのは「長おし」。本人のスイッチで止まらないようにしています</li>
     </ul>
     <button class="btn-start" id="btnStart" type="button">はじめる</button>
     <button class="btn-sub" id="btnTest" type="button">音をためす（2秒）</button>
@@ -131,18 +135,18 @@ button:focus-visible { outline: 6px solid var(--focus); outline-offset: 4px; }
   <button class="call" id="btnCall" type="button" hidden>
     <span class="big">呼ぶ</span><span class="small">押すと音が鳴ります</span>
   </button>
-  <div class="status" id="status" hidden aria-live="polite">
+  <div class="status" id="status" hidden aria-hidden="true">
     <span><span class="label">今日のコール</span><b id="count">0回</b></span>
     <span class="times" id="times"></span>
   </div>
-  <p class="note" id="note" hidden>記録はこのiPadの中だけに残ります。訪問看護さんに見せる用</p>
+  <p class="note" id="note" hidden aria-hidden="true">記録はこのiPadの中だけに残ります。訪問看護さんに見せる用</p>
 </div>
 
 <div class="alarm" id="alarm" hidden role="alertdialog" aria-labelledby="alarmWhat">
   <div class="what" id="alarmWhat">呼んでいます</div>
   <div class="sub">いったん手を止めて<br>顔を見てください</div>
   <div class="when" id="alarmWhen">いま</div>
-  <button class="btn-stop" id="btnStop" type="button">とめる</button>
+  <button class="btn-stop" id="btnStop" type="button"><span class="fill" id="stopFill"></span><span class="lbl">長おしで とめる</span></button>
 </div>
 
 <script>
@@ -231,16 +235,30 @@ button:focus-visible { outline: 6px solid var(--focus); outline-offset: 4px; }
       var s = Math.floor((Date.now() - calledAt) / 1000);
       $("alarmWhen").textContent = hm(calledAt) + " にコール ・ " + (s < 60 ? s + "秒" : Math.floor(s/60) + "分" + (s%60) + "秒") + "経過";
     }, 1000);
-    setTimeout(function () { $("btnStop").focus(); }, 50);
+    $("app").inert = true;
   });
 
-  $("btnStop").addEventListener("click", function () {
+  // stop needs a 1.5s hold, so a Switch Control tap (the patient's switch) can't silence it
+  var HOLD = 1500, holdTimer = null, holdStart = 0, raf = null;
+  function holdFrame() {
+    var r = Math.min(1, (Date.now() - holdStart) / HOLD);
+    $("stopFill").style.width = (r * 100) + "%";
+    if (r < 1) raf = requestAnimationFrame(holdFrame);
+  }
+  function holdCancel() { clearTimeout(holdTimer); cancelAnimationFrame(raf); $("stopFill").style.width = "0"; }
+  $("btnStop").addEventListener("pointerdown", function (e) {
+    e.preventDefault(); holdStart = Date.now(); holdFrame();
+    holdTimer = setTimeout(function () { holdCancel(); stopAlarm(); }, HOLD);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { $("btnStop").addEventListener(ev, holdCancel); });
+  $("btnStop").addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  function stopAlarm() {
     stopSound(); clearInterval(tick);
     var last = calls[calls.length - 1];
     if (last && last.at === calledAt) { last.wait = Math.round((Date.now() - calledAt) / 1000); saveLog(); }
-    $("alarm").hidden = true; renderStatus();
-    setTimeout(function () { $("btnCall").focus(); }, 50);
-  });
+    $("alarm").hidden = true; $("app").inert = false; renderStatus();
+  }
 })();
 </script>
 </body></html>
